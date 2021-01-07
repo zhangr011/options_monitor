@@ -5,27 +5,25 @@
 
 ## 数据获取方式
 
-### 中金所
-Request URL: http://www.cffex.com.cn/sj/hqsj/rtj/202101/05/index.xml?id=0
-id 设置一个随机访问 id
-返回 xml 格式
-### 上期所
-Request URL: http://www.shfe.com.cn/data/dailydata/kx/kx20210105.dat
-Request URL: http://www.shfe.com.cn/data/dailydata/option/kx/kx20210105.dat
-返回 json 格式
-### 大商所
-Request URL: http://www.dce.com.cn/publicweb/quotesdata/dayQuotesCh.html
-Request Method: POST
-dayQuotes.variety: all
-dayQuotes.trade_type: 0 （0 - 期货 1 - 期权）
-year: 2021
-month: 0 （不是从 1 开始）
-day: 05 （前面补0）
-返回网页，需要对网页解析
-### 郑商所
-Request URL: http://www.czce.com.cn/cn/DFSStaticFiles/Future/2021/20210105/FutureDataDaily.htm
-Request URL: http://www.czce.com.cn/cn/DFSStaticFiles/Option/2021/20210105/OptionDataDaily.htm
-返回网页，需要对网页进行解析
+| 各交易所数据获取方式 | |
+|---------------|--------------------------------------------------------------|
+| **中金所** | |
+| Request URL | http://www.cffex.com.cn/sj/hqsj/rtj/202101/05/index.xml?id=0 |
+| 参数 | id 设置一个随机访问 id |
+| 返回 | xml 格式 |
+| **上期所** | |
+| Request URL | http://www.shfe.com.cn/data/dailydata/kx/kx20210105.dat |
+| Request URL | http://www.shfe.com.cn/data/dailydata/option/kx/kx20210105.dat |
+| 返回 | json 格式 |
+| **大商所** | |
+| Request URL | http://www.dce.com.cn/publicweb/quotesdata/dayQuotesCh.html |
+| Request Method | POST |
+| Params | dayQuotes.variety：all<br />dayQuotes.trade_type: 0 （0 - 期货 1 - 期权）<br />year: 2021<br />month: 0 （不是从 1 开始）<br />day: 05 （前面补0） |
+| 返回 | 网页，需要对网页解析 |
+| **郑商所** | |
+| Request URL | http://www.czce.com.cn/cn/DFSStaticFiles/Future/2021/20210105/FutureDataDaily.htm
+| Request URL | http://www.czce.com.cn/cn/DFSStaticFiles/Option/2021/20210105/OptionDataDaily.htm
+| 返回 | 网页，需要对网页进行解析 |
 
 ## 计算方法
 ### 商品指数
