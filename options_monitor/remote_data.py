@@ -1,39 +1,51 @@
 #encoding: UTF-8
 
 from .utilities import \
-    CHECK_SECTION, INDEX_KEY, DATE_FORMAT, \
-    check_file_integrity, load_vix_by_csv
+    INDEX_KEY, DATE_FORMAT, load_vix_by_csv
 from .logger import logger
 
 from abc import abstractclassmethod, ABCMeta
 from enum import Enum
-import os, re, configparser, traceback, urllib, urllib3, requests, http, time
+import os, re, json, traceback, urllib, urllib3, requests, http, time
+from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 import dateutil.parser as date_parser
 import pandas as pd
-import pandas_datareader as pdr
 
 
 #----------------------------------------------------------------------
 class SYNC_DATA_MODE(Enum):
-    HTTP_DOWNLOAD = 1
-    HTTP_DOWNLOAD_YAHOO = 2
-    PANDAS_DATAREADER_YAHOO = 11
+    HTTP_DOWNLOAD_CFFE = 1
+    HTTP_DOWNLOAD_SHFE = 2
+    HTTP_DOWNLOAD_DCE = 3
+    HTTP_DOWNLOAD_CZCE = 4
+    # 沪深 300 指数
+    HTTP_DOWNLOAD_CSINDEX_000300 = 5
 
 
 FIX_FILE_PATTERN = re.compile(r'\^|\=')
 
 
 #----------------------------------------------------------------------
-class IRemoteData(metaclass = ABCMeta):
+def get_content_json(response):
+    return json.loads(response.text)
 
-    def __init__(self, ini_parser: configparser.ConfigParser,
-                 data_path: str, local: str, remote_path: str):
+
+#----------------------------------------------------------------------
+def get_content_soup(response):
+    return BeautifulSoup(response.text, 'html.parser')
+
+
+#----------------------------------------------------------------------
+class IRemoteHttpData(metaclass = ABCMeta):
+
+    remote_path = ""
+
+    def __init__(self, data_path: str, local: str, dates: list):
         """Constructor"""
-        self.ini_parser = ini_parser
         self.data_path = data_path
         self.local = self.fix_file_name(local)
-        self.remote_path = remote_path
+        self.dates = dates
 
     #----------------------------------------------------------------------
     def fix_file_name(self, local: str):
@@ -52,60 +64,6 @@ class IRemoteData(metaclass = ABCMeta):
         return os.path.join(self.data_path, self.get_local_file())
 
     #----------------------------------------------------------------------
-    def get_local_checksum(self):
-        """get local file's checksum"""
-        try:
-            if self.ini_parser:
-                return self.ini_parser.get(CHECK_SECTION, self.get_local_file())
-            return None
-        except configparser.NoOptionError:
-            return None
-
-    #----------------------------------------------------------------------
-    def sync_data(self):
-        """sync the data if needed. """
-        checksum = self.get_local_checksum()
-        local_path = self.get_local_path()
-        if not check_file_integrity(local_path, checksum):
-            try:
-                data = self.do_sync_data()
-                logger.info(f'{self.get_local_path()} downloaded. ')
-                return data
-            except (http.client.RemoteDisconnected,
-                    urllib.error.URLError,
-                    urllib.error.HTTPError,
-                    urllib3.exceptions.MaxRetryError,
-                    requests.exceptions.ConnectionError,
-                    pdr._utils.RemoteDataError):
-                # for network error handling
-                # logger.error(f'{self.remote_path} download failed: {traceback.format_exc()}')
-                logger.error(f'{self.remote_path} download failed: {traceback.format_exc(limit = 0)}')
-            except:
-                logger.error(f'{self.remote_path} download failed: {traceback.format_exc()}')
-
-    #----------------------------------------------------------------------
-    @abstractclassmethod
-    def do_sync_data(self):
-        """do the sync"""
-        pass
-
-
-#----------------------------------------------------------------------
-class RemoteHttpData(IRemoteData):
-
-    #----------------------------------------------------------------------
-    def do_sync_data(self):
-        """sync the data"""
-        data = pd.read_csv(self.remote_path)
-        # without index
-        data.to_csv(index = False, path_or_buf = self.get_local_path())
-        return data
-
-
-#----------------------------------------------------------------------
-class RemotePDRYahooData(IRemoteData):
-
-    #----------------------------------------------------------------------
     def get_last_index(self):
         """get the local last index"""
         try:
@@ -115,20 +73,29 @@ class RemotePDRYahooData(IRemoteData):
             return None, None
 
     #----------------------------------------------------------------------
-    def query_remote(self, start: str):
-        """query the remote data"""
-        data = pdr.get_data_yahoo(self.remote_path, start = start)
-        return data
-
-    #----------------------------------------------------------------------
-    def fix_data_index(self, data):
-        data.index = data.index.strftime(DATE_FORMAT)
+    def sync_data(self):
+        """sync the data if needed. """
+        try:
+            data = self.do_sync_data()
+            logger.info(f'{self.get_local_path()} downloaded. ')
+            return data
+        except (http.client.RemoteDisconnected,
+                urllib.error.URLError,
+                urllib.error.HTTPError,
+                urllib3.exceptions.MaxRetryError,
+                requests.exceptions.ConnectionError):
+            # for network error handling
+            # logger.error(f'{self.remote_path} download failed: {traceback.format_exc()}')
+            logger.error(f'{self.remote_path} download failed: {traceback.format_exc(limit = 0)}')
+        except:
+            logger.error(f'{self.remote_path} download failed: {traceback.format_exc()}')
 
     #----------------------------------------------------------------------
     def do_sync_data(self):
         """sync the data"""
         li, ldf = self.get_last_index()
-        data = self.query_remote(li)
+        raw_data = self.do_query_remote(li)
+        data = self.do_data_handle(raw_data)
         data.index.rename(INDEX_KEY, inplace = True)
         # with index
         if ldf is None:
@@ -144,64 +111,74 @@ class RemotePDRYahooData(IRemoteData):
             data.to_csv(path_or_buf = self.get_local_path())
         return data
 
+    #----------------------------------------------------------------------
+    def do_query_remote(self, date_str: str):
+        """query the remote data"""
+        url = self.get_remote_path(date_str)
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            return response
+        except Exception as e:
+            logger.error(f"http requests failed. {traceback.format_exc(limit = 0)}")
+            return False
+
+    #----------------------------------------------------------------------
+    def get_remote_path(self, date_str: str):
+        """get the http request string"""
+        raise NotImplementedError
+
+    #----------------------------------------------------------------------
+    def do_data_handle(self, data):
+        raise NotImplementedError
+
 
 #----------------------------------------------------------------------
-class RemoteHttpYahooData(RemotePDRYahooData):
+class RemoteHttpCSIndex000300Data(IRemoteData):
 
-    download_url = "https://query1.finance.yahoo.com/v7/finance/download/"
-    download_url_suffix = "interval=1d&events=history&includeAdjustedClose=true"
+    remote_path = "http://www.csindex.com.cn/zh-CN/indices/index-detail/000300?earnings_performance=%s&data_type=json"
 
-    #----------------------------------------------------------------------
-    def query_remote(self, start: str):
-        """download the data"""
-        url = self.mk_url(start)
-        logger.info(f'download url: {url}')
-        data = pd.read_csv(url, index_col = 0)
-        return data
+    one_month = "1%E4%B8%AA%E6%9C%88"
+    three_years = "3%E5%B9%B4"
 
     #----------------------------------------------------------------------
-    def mk_url(self, start: str):
-        """make the download url"""
-        if start is None:
-            start = '2010-01-01'
-        # refresh the last 3 days data
-        start_datetime = date_parser.parse(start) + timedelta(days = -3)
-        start_utime = int(time.mktime(start_datetime.timetuple()))
-        end_datetime = datetime.now().replace(hour = 23, minute = 59, second = 59)
-        end_utime = int(time.mktime(end_datetime.timetuple()))
-        # This needed because yahoo returns data shifted by 4 hours ago.
-        four_hours_in_seconds = 14400
-        start_utime += four_hours_in_seconds
-        end_utime += four_hours_in_seconds
-        return f"{self.download_url}{self.remote_path}?period1={start_utime}&period2={end_utime}&{self.download_url_suffix}"
+    def get_remote_path(self, date_str: str):
+        """quety the remote data"""
+        if date_str is None:
+            return self.remote_path % self.three_years
+        else:
+            return self.remote_path % self.one_month
+
+
+#----------------------------------------------------------------------
+class RemoteHttpCFFEData(IRemoteData):
+
+    # http://www.cffex.com.cn/sj/hqsj/rtj/202101/05/index.xml?id=0
+    remote_path = "http://www.cffex.com.cn/sj/hqsj/rtj/202101/05/index.xml?id=0"
+
 
     #----------------------------------------------------------------------
-    def fix_data_index(self,  data):
-        """no need to fix. """
-        pass
+    def fix_data_index(self, data):
+        data.index = data.index.strftime(DATE_FORMAT)
 
 
 #----------------------------------------------------------------------
 class RemoteDataFactory():
 
     data_path = ''
-    ini_parser = None
 
-    def __init__(self, data_path: str, ini_parser: configparser.ConfigParser):
+    def __init__(self, data_path: str):
         """Constructor"""
         self.data_path = data_path
-        self.ini_parser = ini_parser
 
     #----------------------------------------------------------------------
     def create(self, local: str, remote: str, via: SYNC_DATA_MODE):
         """the creator of RemoteData"""
-        if SYNC_DATA_MODE.HTTP_DOWNLOAD == via:
-            return RemoteHttpData(
-                self.ini_parser, self.data_path, local, remote)
-        elif SYNC_DATA_MODE.PANDAS_DATAREADER_YAHOO == via:
-            return RemotePDRYahooData(
-                self.ini_parser, self.data_path, local, remote)
-        elif SYNC_DATA_MODE.HTTP_DOWNLOAD_YAHOO == via:
-            return RemoteHttpYahooData(
-                self.ini_parser, self.data_path, local, remote)
+        data_class = None
+        if SYNC_DATA_MODE.HTTP_DOWNLOAD_CSINDEX_000300 == via:
+            data_class = RemoteHttpCSIndex000300Data
+        elif SYNC_DATA_MODE.HTTP_DOWNLOAD_CFFE == via:
+            data_class = RemoteHttpCFFEData
+        if data_class != None:
+            return data_class(self.data_path, local, dates)
         raise NotImplementedError

@@ -1,7 +1,9 @@
 # encoding: UTF-8
 
+from options_monitor.utilities import get_last_year_trade_dates
 from options_monitor.schedule_manager import ScheduleManager
 from options_monitor.util_dingding import send_md_msg
+from options_monitor.data_manager import CSIndex000300DataManager
 from options_monitor.logger import logger
 from datetime import datetime, timezone
 from time import sleep
@@ -16,6 +18,8 @@ class MonitorScheduleManager(ScheduleManager):
 
     def do_timeout(self):
         """"""
+        dates = get_last_year_trade_dates()
+        csindex000300_mgr = CSIndex000300DataManager(dates)
         logger.info('start schedule task. ')
         logger.info('schedule task done. ')
         return self.clear_and_return_true()

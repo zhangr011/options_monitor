@@ -12,21 +12,20 @@ from .logger import logger
 # Date format: Year-Month-Day
 DATE_FORMAT ='%Y-%m-%d'
 DATE_FORMAT_PATTERN = re.compile(r'(\d{4}-\d{2}-\d{2})')
-# INIT_DATE for fix empty delivery dates
-INIT_DATE = '1900-01-01'
 
-cboe_calendar = market_cal.get_calendar('CME')
+
+# shanghai stock exchange
+sse_calendar = market_cal.get_calendar('SSE')
+# timezone('Asia/Shanghai')
+TZ_INFO = sse_calendar.tz.zone
 
 ONE_DAY = datetime.timedelta(days = 1)
 SEVEN_DAYS = datetime.timedelta(days = 7)
-TZ_INFO = 'America/Chicago'
 
 # data root
 DATA_ROOT = './data'
 TEST_DATA_ROOT = './test/data'
 
-# section name for ini parser
-CHECK_SECTION = 'checksum'
 # index key for file check
 INDEX_KEY = 'Trade Date'
 SETTLE_PRICE_NAME = 'Settle'
@@ -56,6 +55,17 @@ def get_day_index(last_day: datetime, hour: int):
 
 
 #----------------------------------------------------------------------
+def get_last_year_trade_dates(delta: int = 400):
+    end_time = datetime.datetime.now(sse_calendar.tz)
+    # about 13 months ago
+    start_time = end_time + datetime.timedelta(days = -delta)
+    schedule_days = sse_calendar.schedule(
+        start_date = start_time.strftime(DATE_FORMAT),
+        end_date = end_time.strftime(DATE_FORMAT))
+    return schedule_days
+
+
+#----------------------------------------------------------------------
 def make_sure_dirs_exist(path):
     """确保目录存在"""
     is_exist = os.path.exists(path)
@@ -67,31 +77,8 @@ def make_sure_dirs_exist(path):
 
 
 #----------------------------------------------------------------------
-def hash_file(filename):
-    # make a hash object
-    hash = hashlib.sha1()
-    with open(filename,'rb') as file:
-        # loop until end of file
-        chunk = 0
-        while chunk != b'':
-            # read only 1024 bytes at a timedelta
-            chunk = file.read(1024)
-            hash.update(chunk)
-        # return hex of digest
-        return hash.hexdigest()
-
-
-#----------------------------------------------------------------------
 def get_file_path(filename: str) -> str:
     return os.path.join(DATA_ROOT, filename)
-
-
-#----------------------------------------------------------------------
-def check_file_integrity(path: str, checksum: str):
-    """check the local path data """
-    if checksum and hash_file(path) == checksum:
-        return True
-    return False
 
 
 #----------------------------------------------------------------------
@@ -101,51 +88,6 @@ def check_data_integrity(path: str, date: str):
     if not data.empty and data[INDEX_KEY].iloc[-1] == date:
         return True
     return False
-
-
-#----------------------------------------------------------------------
-def generate_csv_checksums(path: str):
-    """generate all csv files' checksums"""
-    checksums = []
-    for root, dirs, filenames in os.walk(path):
-        for fn in filenames:
-            date, ext = os.path.splitext(fn)
-            if '.csv' == ext:
-                filepath = os.path.join(root, fn)
-                if check_data_integrity(filepath, date):
-                    checksums.append((fn, hash_file(filepath)))
-    return checksums
-
-
-#----------------------------------------------------------------------
-def filter_deliver_date(deliver_date: list, end_date: str, times: int = 12):
-    """filter the last n deliver date, default to one year """
-    dates = []
-    for item in deliver_date:
-        if item < end_date:
-            dates.append(item)
-    # return the last n dates
-    return dates[-times:]
-
-
-#----------------------------------------------------------------------
-def filter_delivery_dates(delivery_dates: list, end_date: str, times: int = 12):
-    """fitler the last n delivery dates, default to one year"""
-    dates = []
-    for item in delivery_dates:
-        if item < end_date:
-            dates.append(item)
-    # return the last n dates
-    return dates[-times:]
-
-
-#----------------------------------------------------------------------
-def shift_delivery_dates(full_delivery_dates, delivery_dates,
-                         times: int = 1, size: int = 12):
-    """shift the delivery dates back, default back one month"""
-    sdate = delivery_dates[0]
-    idx = full_delivery_dates.index(sdate) + times
-    return full_delivery_dates[idx:idx + size]
 
 
 #----------------------------------------------------------------------
@@ -299,28 +241,6 @@ def percent_distribution(vix: pd.Series, val: float = None):
         else:
             break
     return ret
-
-
-#----------------------------------------------------------------------
-def generate_futures_chain(symbol: str, suffix: str, date: str = None):
-    """generate the futures chain of symbol"""
-    if not symbol or not suffix:
-        return []
-    if date is None:
-        now = datetime.datetime.now()
-        month = now.month
-        year = now.year
-    else:
-        now = datetime.datetime.strptime(date, DATE_FORMAT)
-        month = now.month
-        year = now.year
-    chain = []
-    for idx, mflag in enumerate(FUTURES_CHAIN):
-        if idx + 1 <= month:
-            chain.append(f'{symbol}{mflag}{(year + 1) % 100}.{suffix}')
-        if idx + 1 >= month:
-            chain.append(f'{symbol}{mflag}{year % 100}.{suffix}')
-    return chain
 
 
 #----------------------------------------------------------------------
