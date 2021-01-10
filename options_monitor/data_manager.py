@@ -1,10 +1,9 @@
 # encoding: UTF-8
 
 from .utilities import \
-    CHECK_SECTION, make_sure_dirs_exist, \
-    get_file_path, generate_csv_checksums, combine_all, \
+    make_sure_dirs_exist, DATA_ROOT, get_file_path, combine_all, \
     analyze_diff_percent, load_futures_by_csv, load_vix_by_csv, \
-    close_ma5_ma10_ma20, generate_futures_chain
+    close_ma5_ma10_ma20
 from .remote_data import RemoteDataFactory, SYNC_DATA_MODE
 from .logger import logger
 
@@ -16,9 +15,10 @@ import pandas as pd
 class DataManager():
 
     data_mode = None
-    data_path = ''
+    data_path = DATA_ROOT
+    local = ''
 
-    def __init__(self, trade_dates: list = []):
+    def __init__(self, trade_dates: pd.DataFrame):
         """Constructor"""
         self._trade_dates = trade_dates
 
@@ -30,7 +30,7 @@ class DataManager():
         make_sure_dirs_exist(self.data_path)
         logger.info(f'start downloading data from {self.data_mode}')
         data_fac = RemoteDataFactory(self.data_path)
-        rdata = data_fac.create(self.data_mode, self._trade_dates)
+        rdata = data_fac.create(self.local, self.data_mode, self._trade_dates)
         rdata.sync_data()
         logger.info('all data downloaded. ')
 
@@ -44,7 +44,7 @@ class DataManager():
 class CSIndex000300DataManager(DataManager):
 
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_CSINDEX_000300
-    data_path = get_file_path('csindex_000300')
+    local = 'csindex_000300'
 
     #----------------------------------------------------------------------
     def analyze(self):
@@ -56,7 +56,7 @@ class CSIndex000300DataManager(DataManager):
 class CFFEDataManager(DataManager):
 
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_CFFE
-    data_path = get_file_path('cffe')
+    local = 'cffe'
 
     #----------------------------------------------------------------------
     def analyze(self):

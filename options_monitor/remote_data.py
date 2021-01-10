@@ -1,7 +1,7 @@
 #encoding: UTF-8
 
 from .utilities import \
-    INDEX_KEY, DATE_FORMAT, load_vix_by_csv
+    INDEX_KEY, DATE_FORMAT, CLOSE_PRICE_NAME, load_vix_by_csv
 from .logger import logger
 
 from abc import abstractclassmethod, ABCMeta
@@ -97,6 +97,7 @@ class IRemoteHttpData(metaclass = ABCMeta):
         raw_data = self.do_query_remote(li)
         data = self.do_data_handle(raw_data)
         data.index.rename(INDEX_KEY, inplace = True)
+        print(data)
         # with index
         if ldf is None:
             data.to_csv(path_or_buf = self.get_local_path())
@@ -104,7 +105,6 @@ class IRemoteHttpData(metaclass = ABCMeta):
             # append data to the local path, this is not work due to the last
             # row is changed from time to time
             # data.to_csv(path_or_buf = self.get_local_path(), mode = 'a', header = False)
-            self.fix_data_index(data)
             data = pd.concat([ldf, data])
             # drop the duplicated index rows
             data = data[~data.index.duplicated(keep = 'last')]
@@ -134,7 +134,7 @@ class IRemoteHttpData(metaclass = ABCMeta):
 
 
 #----------------------------------------------------------------------
-class RemoteHttpCSIndex000300Data(IRemoteData):
+class RemoteHttpCSIndex000300Data(IRemoteHttpData):
 
     remote_path = "http://www.csindex.com.cn/zh-CN/indices/index-detail/000300?earnings_performance=%s&data_type=json"
 
@@ -149,9 +149,20 @@ class RemoteHttpCSIndex000300Data(IRemoteData):
         else:
             return self.remote_path % self.one_month
 
+    #----------------------------------------------------------------------
+    def do_data_handle(self, data):
+        """"""
+        data_list = get_content_json(data)
+        df = pd.json_normalize(data_list)
+        df.drop(['indx_code', 'changes'], axis = 1, inplace = True)
+        df.set_index(['tradedate'], inplace = True)
+        df.index = df.index.str.replace(' 00:00:00', '')
+        df.rename(columns = {'tclose' : CLOSE_PRICE_NAME}, inplace = True)
+        return df
+
 
 #----------------------------------------------------------------------
-class RemoteHttpCFFEData(IRemoteData):
+class RemoteHttpCFFEData(IRemoteHttpData):
 
     # http://www.cffex.com.cn/sj/hqsj/rtj/202101/05/index.xml?id=0
     remote_path = "http://www.cffex.com.cn/sj/hqsj/rtj/202101/05/index.xml?id=0"
@@ -172,7 +183,7 @@ class RemoteDataFactory():
         self.data_path = data_path
 
     #----------------------------------------------------------------------
-    def create(self, local: str, remote: str, via: SYNC_DATA_MODE):
+    def create(self, local: str, via: SYNC_DATA_MODE, dates: pd.DataFrame):
         """the creator of RemoteData"""
         data_class = None
         if SYNC_DATA_MODE.HTTP_DOWNLOAD_CSINDEX_000300 == via:
