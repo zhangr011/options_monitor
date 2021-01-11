@@ -1,7 +1,8 @@
 #encoding: UTF-8
 
 from .utilities import \
-    INDEX_KEY, DATE_FORMAT, CLOSE_PRICE_NAME, load_vix_by_csv
+    INDEX_KEY, DATE_FORMAT, CLOSE_PRICE_NAME, check_date_in, load_futures_by_csv
+from .xml_to_pandas_dataframe import xml_to_pandas_dataframe
 from .logger import logger
 
 from abc import abstractclassmethod, ABCMeta
@@ -37,11 +38,17 @@ def get_content_soup(response):
 
 
 #----------------------------------------------------------------------
+def get_content_xml(response, columns: list, row_name: str):
+    df = xml_to_pandas_dataframe(response.text, columns, row_name)
+    return df
+
+
+#----------------------------------------------------------------------
 class IRemoteHttpData(metaclass = ABCMeta):
 
     remote_path = ""
 
-    def __init__(self, data_path: str, local: str, dates: list):
+    def __init__(self, data_path: str, local: str, dates: pd.DataFrame):
         """Constructor"""
         self.data_path = data_path
         self.local = self.fix_file_name(local)
@@ -67,7 +74,7 @@ class IRemoteHttpData(metaclass = ABCMeta):
     def get_last_index(self):
         """get the local last index"""
         try:
-            df = load_vix_by_csv(self.get_local_path())
+            df = load_futures_by_csv(self.get_local_path())
             return df.index[-1], df
         except (FileNotFoundError, IndexError):
             return None, None
@@ -76,7 +83,9 @@ class IRemoteHttpData(metaclass = ABCMeta):
     def sync_data(self):
         """sync the data if needed. """
         try:
-            data = self.do_sync_data()
+            li, ldf = self.get_last_index()
+            dates = self.get_the_request_dates(li)
+            data = self.do_sync_data(dates, ldf)
             logger.info(f'{self.get_local_path()} downloaded. ')
             return data
         except (http.client.RemoteDisconnected,
@@ -86,15 +95,30 @@ class IRemoteHttpData(metaclass = ABCMeta):
                 requests.exceptions.ConnectionError):
             # for network error handling
             # logger.error(f'{self.remote_path} download failed: {traceback.format_exc()}')
-            logger.error(f'{self.remote_path} download failed: {traceback.format_exc(limit = 0)}')
+            logger.error(f'sync data failed: {traceback.format_exc(limit = 0)}')
         except:
-            logger.error(f'{self.remote_path} download failed: {traceback.format_exc()}')
+            logger.error(f'sync data failed: {traceback.format_exc()}')
 
     #----------------------------------------------------------------------
-    def do_sync_data(self):
+    def get_the_request_dates(self, local_date: str):
+        """get the request date according to the local date and trade dates"""
+        if local_date is None:
+            return self.dates.index.strftime(DATE_FORMAT)
+        else:
+            return self.dates.index[self.dates.index > local_date].strftime(DATE_FORMAT)
+
+    #----------------------------------------------------------------------
+    def do_sync_data(self, dates: pd.Index, ldf: pd.DataFrame):
         """sync the data"""
-        li, ldf = self.get_last_index()
-        raw_data = self.do_query_remote(li)
+        for date in dates:
+            ldf = self.do_sync_data_one_by_one(date, ldf)
+            time.sleep(0.5)
+        return ldf
+
+    #----------------------------------------------------------------------
+    def do_sync_data_one_by_one(self, request_date, ldf: pd.DataFrame):
+        """request one"""
+        raw_data = self.do_query_remote(request_date)
         data = self.do_data_handle(raw_data)
         data.index.rename(INDEX_KEY, inplace = True)
         print(data)
@@ -120,7 +144,7 @@ class IRemoteHttpData(metaclass = ABCMeta):
             response.raise_for_status()
             return response
         except Exception as e:
-            logger.error(f"http requests failed. {traceback.format_exc(limit = 0)}")
+            logger.error(f"http requests failed. {url} {traceback.format_exc(limit = 0)}")
             return False
 
     #----------------------------------------------------------------------
@@ -142,9 +166,17 @@ class RemoteHttpCSIndex000300Data(IRemoteHttpData):
     three_years = "3%E5%B9%B4"
 
     #----------------------------------------------------------------------
-    def get_remote_path(self, date_str: str):
+    def do_sync_data(self, request_dates: pd.Index, ldf: pd.DataFrame):
+        """do sync data at one time"""
+        if request_dates.empty:
+            return ldf
+        else:
+            return self.do_sync_data_one_by_one(request_dates, ldf)
+
+    #----------------------------------------------------------------------
+    def get_remote_path(self, dates: pd.Index):
         """quety the remote data"""
-        if date_str is None:
+        if dates.size > 15:
             return self.remote_path % self.three_years
         else:
             return self.remote_path % self.one_month
@@ -165,12 +197,34 @@ class RemoteHttpCSIndex000300Data(IRemoteHttpData):
 class RemoteHttpCFFEData(IRemoteHttpData):
 
     # http://www.cffex.com.cn/sj/hqsj/rtj/202101/05/index.xml?id=0
-    remote_path = "http://www.cffex.com.cn/sj/hqsj/rtj/202101/05/index.xml?id=0"
-
+    remote_path = "http://www.cffex.com.cn/sj/hqsj/rtj/%s/%s/index.xml?id=%d"
+    id_request = 0
 
     #----------------------------------------------------------------------
-    def fix_data_index(self, data):
-        data.index = data.index.strftime(DATE_FORMAT)
+    def get_remote_path(self, date: str):
+        """query the remote data"""
+        str_list = date.split('-')
+        year_month = str_list[0] + str_list[1]
+        day = str_list[2]
+        self.id_request += 1
+        return self.remote_path % (year_month, day, self.id_request)
+
+    #----------------------------------------------------------------------
+    def do_data_handle(self, data):
+        """"""
+        df = get_content_xml(
+            data,
+            ['instrumentid', 'tradingday', 'openprice', 'highestprice', 'lowestprice', 'closeprice',
+             'preopeninterest', 'openinterest', 'presettlementprice',
+             'settlementpriceif', 'settlementprice',
+             'volume', 'turnover', 'productid', 'delta', 'expiredate'],
+            'dailydata')
+        df.set_index(['tradingday'], inplace = True)
+        # format the trade day
+        index = df.index.str.slice_replace(6, stop = 6, repl = '-')
+        df.index = index.str.slice_replace(4, stop = 4, repl = '-')
+        df.rename(columns = {'closeprice': CLOSE_PRICE_NAME}, inplace = True)
+        return df
 
 
 #----------------------------------------------------------------------

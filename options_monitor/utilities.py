@@ -55,7 +55,7 @@ def get_day_index(last_day: datetime, hour: int):
 
 
 #----------------------------------------------------------------------
-def get_last_year_trade_dates(delta: int = 400):
+def get_last_trade_dates(delta: int = 400):
     end_time = datetime.datetime.now(sse_calendar.tz)
     # about 13 months ago
     start_time = end_time + datetime.timedelta(days = -delta)
@@ -63,6 +63,11 @@ def get_last_year_trade_dates(delta: int = 400):
         start_date = start_time.strftime(DATE_FORMAT),
         end_date = end_time.strftime(DATE_FORMAT))
     return schedule_days
+
+
+#----------------------------------------------------------------------
+def check_date_in(date_str: str, dates: pd.DataFrame):
+    return date_str in dates.index
 
 
 #----------------------------------------------------------------------
@@ -359,14 +364,6 @@ def mk_notification(vix_futures: pd.DataFrame,
 #----------------------------------------------------------------------
 def load_futures_by_csv(path: str):
     """load futures info by csv"""
-    df = pd.read_csv(path, index_col = False)
-    df.set_index(INDEX_KEY, inplace = True)
-    return df
-
-
-#----------------------------------------------------------------------
-def load_vix_by_csv(path: str):
-    """load vix info by csv"""
     df = pd.read_csv(path)
     df.set_index(INDEX_KEY, inplace = True)
     return df

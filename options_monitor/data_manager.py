@@ -2,8 +2,7 @@
 
 from .utilities import \
     make_sure_dirs_exist, DATA_ROOT, get_file_path, combine_all, \
-    analyze_diff_percent, load_futures_by_csv, load_vix_by_csv, \
-    close_ma5_ma10_ma20
+    analyze_diff_percent, load_futures_by_csv, close_ma5_ma10_ma20
 from .remote_data import RemoteDataFactory, SYNC_DATA_MODE
 from .logger import logger
 

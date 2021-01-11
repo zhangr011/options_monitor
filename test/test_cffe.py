@@ -3,15 +3,15 @@
 import unittest as ut
 
 from options_monitor.utilities import get_last_trade_dates
-from options_monitor.data_manager import CSIndex000300DataManager
+from options_monitor.data_manager import CFFEDataManager
 
 
 #----------------------------------------------------------------------
-class TestCSIndex000300Data(ut.TestCase):
+class TestCFFEData(ut.TestCase):
 
     def testData(self):
         dates = get_last_trade_dates()
-        mgr = CSIndex000300DataManager(dates)
+        mgr = CFFEDataManager(dates)
         mgr.download_raw_data()
 
 
