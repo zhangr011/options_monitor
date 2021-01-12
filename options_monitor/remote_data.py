@@ -17,11 +17,19 @@ import pandas as pd
 #----------------------------------------------------------------------
 class SYNC_DATA_MODE(Enum):
     HTTP_DOWNLOAD_CFFE = 1
+    # trading calendar
+    HTTP_DOWNLOAD_CFFE_CALENDAR = 101
     HTTP_DOWNLOAD_SHFE = 2
     HTTP_DOWNLOAD_DCE = 3
     HTTP_DOWNLOAD_CZCE = 4
     # 沪深 300 指数
     HTTP_DOWNLOAD_CSINDEX_000300 = 5
+
+
+#----------------------------------------------------------------------
+class CSV_WRITE_MODE(Enum):
+    APPEND = 1
+    MERGE = 2
 
 
 FIX_FILE_PATTERN = re.compile(r'\^|\=')
@@ -47,8 +55,9 @@ def get_content_xml(response, columns: list, row_name: str):
 class IRemoteHttpData(metaclass = ABCMeta):
 
     remote_path = ""
+    csv_mode = CSV_WRITE_MODE.APPEND
 
-    def __init__(self, data_path: str, local: str, dates: pd.DataFrame):
+    def __init__(self, data_path: str, local: str, dates: pd.Index):
         """Constructor"""
         self.data_path = data_path
         self.local = self.fix_file_name(local)
@@ -103,14 +112,17 @@ class IRemoteHttpData(metaclass = ABCMeta):
     def get_the_request_dates(self, local_date: str):
         """get the request date according to the local date and trade dates"""
         if local_date is None:
-            return self.dates.index.strftime(DATE_FORMAT)
+            return self.dates
         else:
-            return self.dates.index[self.dates.index > local_date].strftime(DATE_FORMAT)
+            return self.dates[self.dates > local_date]
 
     #----------------------------------------------------------------------
-    def do_sync_data(self, dates: pd.Index, ldf: pd.DataFrame):
+    def do_sync_data(self, dates: list, ldf: pd.DataFrame):
         """sync the data"""
+        from .data_manager import calendar_manager
         for date in dates:
+            if calendar_manager.check_closed(date):
+                continue
             ldf = self.do_sync_data_one_by_one(date, ldf)
             time.sleep(0.5)
         return ldf
@@ -126,13 +138,27 @@ class IRemoteHttpData(metaclass = ABCMeta):
         if ldf is None:
             data.to_csv(path_or_buf = self.get_local_path())
         else:
-            # append data to the local path, this is not work due to the last
-            # row is changed from time to time
-            # data.to_csv(path_or_buf = self.get_local_path(), mode = 'a', header = False)
-            data = pd.concat([ldf, data])
-            # drop the duplicated index rows
-            data = data[~data.index.duplicated(keep = 'last')]
-            data.to_csv(path_or_buf = self.get_local_path())
+            if CSV_WRITE_MODE.APPEND == self.csv_mode:
+                self.do_append_data_to_csv(ldf, data)
+            elif CSV_WRITE_MODE.MERGE == self.csv_mode:
+                # update the data
+                data = self.do_merge_data_to_csv(ldf, data)
+        return data
+
+    #----------------------------------------------------------------------
+    def do_append_data_to_csv(self, ldf: pd.DataFrame, data: pd.DataFrame):
+        """append the data into"""
+        data.to_csv(path_or_buf = self.get_local_path(), mode = 'a', header = False)
+
+    #----------------------------------------------------------------------
+    def do_merge_data_to_csv(self, ldf: pd.DataFrame, data: pd.DataFrame):
+        """merge the data into"""
+        # append data to the local path, this is not work due to the last
+        # row is changed from time to time
+        data = pd.concat([ldf, data])
+        # drop the duplicated index rows
+        data = data[~data.index.duplicated(keep = 'last')]
+        data.to_csv(path_or_buf = self.get_local_path())
         return data
 
     #----------------------------------------------------------------------
@@ -161,6 +187,7 @@ class IRemoteHttpData(metaclass = ABCMeta):
 class RemoteHttpCSIndex000300Data(IRemoteHttpData):
 
     remote_path = "http://www.csindex.com.cn/zh-CN/indices/index-detail/000300?earnings_performance=%s&data_type=json"
+    csv_mode = CSV_WRITE_MODE.MERGE
 
     one_month = "1%E4%B8%AA%E6%9C%88"
     three_years = "3%E5%B9%B4"
@@ -190,6 +217,29 @@ class RemoteHttpCSIndex000300Data(IRemoteHttpData):
         df.set_index(['tradedate'], inplace = True)
         df.index = df.index.str.replace(' 00:00:00', '')
         df.rename(columns = {'tclose' : CLOSE_PRICE_NAME}, inplace = True)
+        return df
+
+
+#----------------------------------------------------------------------
+class RemoteHttpCFFETradingCalendar(IRemoteHttpData):
+
+    # http://www.cffex.com.cn/sj/jyrl/202011/index_6782.xml
+    remote_path = "http://www.cffex.com.cn/sj/jyrl/%s/index_6782.xml"
+    csv_mode = CSV_WRITE_MODE.MERGE
+
+    #----------------------------------------------------------------------
+    def get_remote_path(self, date: str):
+        """query the remote data"""
+        str_list = date.split('-')
+        year_month = str_list[0] + str_list[1]
+        return self.remote_path % year_month
+
+    #----------------------------------------------------------------------
+    def do_data_handle(self, data):
+        """"""
+        df = get_content_xml(data, ['pubdate', 'title'], 'doc')
+        df.set_index(['pubdate'], inplace = True)
+        df['closed'] = df['title'].str.find(u'休市') != -1
         return df
 
 
@@ -237,13 +287,15 @@ class RemoteDataFactory():
         self.data_path = data_path
 
     #----------------------------------------------------------------------
-    def create(self, local: str, via: SYNC_DATA_MODE, dates: pd.DataFrame):
+    def create(self, local: str, via: SYNC_DATA_MODE, dates: pd.Index):
         """the creator of RemoteData"""
         data_class = None
         if SYNC_DATA_MODE.HTTP_DOWNLOAD_CSINDEX_000300 == via:
             data_class = RemoteHttpCSIndex000300Data
         elif SYNC_DATA_MODE.HTTP_DOWNLOAD_CFFE == via:
             data_class = RemoteHttpCFFEData
+        elif SYNC_DATA_MODE.HTTP_DOWNLOAD_CFFE_CALENDAR == via:
+            data_class = RemoteHttpCFFETradingCalendar
         if data_class != None:
             return data_class(self.data_path, local, dates)
         raise NotImplementedError

@@ -4,7 +4,7 @@ import os, sys, datetime, hashlib, glob, re
 import pandas as pd
 import numpy as np
 import pandas_market_calendars as market_cal
-from functools import reduce
+from functools import reduce, cached_property
 
 from .logger import logger
 
@@ -56,18 +56,17 @@ def get_day_index(last_day: datetime, hour: int):
 
 #----------------------------------------------------------------------
 def get_last_trade_dates(delta: int = 400):
+    delta = int(delta)
     end_time = datetime.datetime.now(sse_calendar.tz)
     # about 13 months ago
     start_time = end_time + datetime.timedelta(days = -delta)
-    schedule_days = sse_calendar.schedule(
-        start_date = start_time.strftime(DATE_FORMAT),
-        end_date = end_time.strftime(DATE_FORMAT))
-    return schedule_days
+    dates = pd.date_range(start = start_time, end = end_time, freq = 'B')
+    return dates.strftime(DATE_FORMAT)
 
 
 #----------------------------------------------------------------------
-def check_date_in(date_str: str, dates: pd.DataFrame):
-    return date_str in dates.index
+def check_date_in(date_str: str, dates: pd.Index):
+    return date_str in dates
 
 
 #----------------------------------------------------------------------

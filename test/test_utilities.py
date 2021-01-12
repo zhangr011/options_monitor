@@ -10,14 +10,14 @@ class TestUtilities(ut.TestCase):
 
     def testGetTradeDates(self):
         """"""
-        dates_df = get_last_trade_dates(30)
-        self.assertEqual(False, dates_df.empty)
+        dates = get_last_trade_dates(30)
+        self.assertEqual(False, dates.empty)
 
     def testCheckDateIn(self):
         """"""
-        dates_df = get_last_trade_dates(30)
-        self.assertEqual(True, check_date_in('2021-01-08', dates_df))
-        self.assertEqual(False, check_date_in('2021-01-10', dates_df))
+        dates = get_last_trade_dates(30)
+        self.assertEqual(True, check_date_in('2021-01-08', dates))
+        self.assertEqual(False, check_date_in('2021-01-10', dates))
 
 
 if __name__ == '__main__':
