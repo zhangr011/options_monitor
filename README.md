@@ -7,6 +7,10 @@
 
 | 各交易所数据获取方式 | |
 |---------------|--------------------------------------------------------------|
+| **中证沪深300指数** | |
+| Request URL | http://www.csindex.com.cn/zh-CN/indices/index-detail/000300?earnings_performance=1%E5%B9%B4&data_type=json |
+| 参数 | earnings_performance 设置 3年/3个月 |
+| 返回 | json 格式 |
 | **中金所** | |
 | Request URL | http://www.cffex.com.cn/sj/hqsj/rtj/202101/05/index.xml?id=0 |
 | 参数 | id 设置一个随机访问 id |
