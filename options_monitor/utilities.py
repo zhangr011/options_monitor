@@ -76,7 +76,7 @@ def get_last_trade_dates(delta: int = 400):
     delta = int(delta)
     end_time = datetime.datetime.now(sse_calendar.tz)
     utc_end_time = end_time.astimezone(datetime.timezone.utc)
-    if utc_end_time.hour < SCHEDULE_HOUR:
+    if utc_end_time.hour < SCHEDULE_HOUR or utc_end_time.day != end_time.day:
         # before the schedule timestamp, back 1 day
         end_time += datetime.timedelta(days = -1)
     # about 13 months ago
