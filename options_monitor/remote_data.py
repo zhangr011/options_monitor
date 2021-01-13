@@ -16,14 +16,16 @@ import pandas as pd
 
 #----------------------------------------------------------------------
 class SYNC_DATA_MODE(Enum):
-    HTTP_DOWNLOAD_CFFE = 1
+    HTTP_DOWNLOAD_CFFE          = 11
     # trading calendar
-    HTTP_DOWNLOAD_CFFE_CALENDAR = 101
-    HTTP_DOWNLOAD_SHFE = 2
-    HTTP_DOWNLOAD_DCE = 3
-    HTTP_DOWNLOAD_CZCE = 4
+    HTTP_DOWNLOAD_CFFE_CALENDAR = 15
+    HTTP_DOWNLOAD_SHFE          = 21
+    HTTP_DOWNLOAD_SHFE_OPTIONS  = 22
+    HTTP_DOWNLOAD_DCE           = 31
+    HTTP_DOWNLOAD_CZCE          = 41
+    HTTP_DOWNLOAD_CZCE_OPTIONS  = 42
     # 沪深 300 指数
-    HTTP_DOWNLOAD_CSINDEX_000300 = 5
+    HTTP_DOWNLOAD_CSINDEX_000300 = 51
 
 
 #----------------------------------------------------------------------
@@ -131,7 +133,7 @@ class IRemoteHttpData(metaclass = ABCMeta):
     def do_sync_data_one_by_one(self, request_date, ldf: pd.DataFrame):
         """request one"""
         raw_data = self.do_query_remote(request_date)
-        data = self.do_data_handle(raw_data)
+        data = self.do_data_handle(raw_data, request_date)
         data.index.rename(INDEX_KEY, inplace = True)
         print(data)
         # with index
@@ -179,7 +181,7 @@ class IRemoteHttpData(metaclass = ABCMeta):
         raise NotImplementedError
 
     #----------------------------------------------------------------------
-    def do_data_handle(self, data):
+    def do_data_handle(self, data, date_str: str):
         raise NotImplementedError
 
 
@@ -209,7 +211,7 @@ class RemoteHttpCSIndex000300Data(IRemoteHttpData):
             return self.remote_path % self.one_month
 
     #----------------------------------------------------------------------
-    def do_data_handle(self, data):
+    def do_data_handle(self, data, date_str: str):
         """"""
         data_list = get_content_json(data)
         df = pd.json_normalize(data_list)
@@ -235,7 +237,7 @@ class RemoteHttpCFFETradingCalendar(IRemoteHttpData):
         return self.remote_path % year_month
 
     #----------------------------------------------------------------------
-    def do_data_handle(self, data):
+    def do_data_handle(self, data, date_str: str):
         """"""
         df = get_content_xml(data, ['pubdate', 'title'], 'doc')
         df.set_index(['pubdate'], inplace = True)
@@ -260,7 +262,7 @@ class RemoteHttpCFFEData(IRemoteHttpData):
         return self.remote_path % (year_month, day, self.id_request)
 
     #----------------------------------------------------------------------
-    def do_data_handle(self, data):
+    def do_data_handle(self, data, date_str: str):
         """"""
         df = get_content_xml(
             data,
@@ -274,6 +276,31 @@ class RemoteHttpCFFEData(IRemoteHttpData):
         index = df.index.str.slice_replace(6, stop = 6, repl = '-')
         df.index = index.str.slice_replace(4, stop = 4, repl = '-')
         df.rename(columns = {'closeprice': CLOSE_PRICE_NAME}, inplace = True)
+        return df
+
+
+#----------------------------------------------------------------------
+class RemoteHttpSHFEData(IRemoteHttpData):
+
+    # http://www.shfe.com.cn/data/dailydata/kx/kx20210105.dat
+    remote_path = "http://www.shfe.com.cn/data/dailydata/kx/kx%s.dat"
+
+    #----------------------------------------------------------------------
+    def get_remote_path(self, date: str):
+        """query the remote data"""
+        str_list = date.split('-')
+        req_date = str_list[0] + str_list[1] + str_list[2]
+        return self.remote_path % req_date
+
+    #----------------------------------------------------------------------
+    def do_data_handle(self, data, date_str: str):
+        """"""
+        data_list = get_content_json(data)
+        data_list = data_list.get('o_curinstrument')
+        df = pd.json_normalize(data_list)
+        df[INDEX_KEY] = date_str
+        df.set_index(INDEX_KEY, inplace = True)
+        df.rename(columns = {'CLOSEPRICE': CLOSE_PRICE_NAME}, inplace = True)
         return df
 
 
@@ -296,6 +323,8 @@ class RemoteDataFactory():
             data_class = RemoteHttpCFFEData
         elif SYNC_DATA_MODE.HTTP_DOWNLOAD_CFFE_CALENDAR == via:
             data_class = RemoteHttpCFFETradingCalendar
+        elif SYNC_DATA_MODE.HTTP_DOWNLOAD_SHFE == via:
+            data_class = RemoteHttpSHFEData
         if data_class != None:
             return data_class(self.data_path, local, dates)
         raise NotImplementedError

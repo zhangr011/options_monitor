@@ -19,6 +19,8 @@ sse_calendar = market_cal.get_calendar('SSE')
 # timezone('Asia/Shanghai')
 TZ_INFO = sse_calendar.tz.zone
 
+SCHEDULE_HOUR = 11
+
 ONE_DAY = datetime.timedelta(days = 1)
 SEVEN_DAYS = datetime.timedelta(days = 7)
 
@@ -58,6 +60,10 @@ def get_day_index(last_day: datetime, hour: int):
 def get_last_trade_dates(delta: int = 400):
     delta = int(delta)
     end_time = datetime.datetime.now(sse_calendar.tz)
+    utc_end_time = end_time.astimezone(datetime.timezone.utc)
+    if utc_end_time.hour < SCHEDULE_HOUR:
+        # before the schedule timestamp, back 1 day
+        end_time += datetime.timedelta(days = -1)
     # about 13 months ago
     start_time = end_time + datetime.timedelta(days = -delta)
     dates = pd.date_range(start = start_time, end = end_time, freq = 'B')

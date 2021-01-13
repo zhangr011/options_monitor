@@ -1,6 +1,6 @@
 # encoding: UTF-8
 
-from options_monitor.utilities import get_last_year_trade_dates
+from options_monitor.utilities import get_last_trade_dates, SCHEDULE_HOUR
 from options_monitor.schedule_manager import ScheduleManager
 from options_monitor.util_dingding import send_md_msg
 from options_monitor.data_manager import CSIndex000300DataManager
@@ -13,7 +13,7 @@ from time import sleep
 class MonitorScheduleManager(ScheduleManager):
 
     # UTC+8
-    _crontab = '30 11 * * *'
+    _crontab = f'05 {SCHEDULE_HOUR} * * *'
     _day_index = None
 
     def do_timeout(self):

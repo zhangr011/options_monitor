@@ -101,3 +101,15 @@ class CFFEDataManager(DataManager):
     def analyze(self):
         """analyze the data"""
         pass
+
+
+#----------------------------------------------------------------------
+class SHFEDataManager(DataManager):
+
+    data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_SHFE
+    local = 'shfe'
+
+    #----------------------------------------------------------------------
+    def analyze(self):
+        """analyze the data"""
+        pass
