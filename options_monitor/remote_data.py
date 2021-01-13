@@ -1,8 +1,14 @@
 #encoding: UTF-8
 
 from .utilities import \
-    INDEX_KEY, DATE_FORMAT, CLOSE_PRICE_NAME, check_date_in, load_futures_by_csv
+    INDEX_KEY, DATE_FORMAT, check_date_in, load_futures_by_csv
+from .utilities import PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, \
+    OPEN_PRICE_NAME, HIGH_PRICE_NAME, LOW_PRICE_NAME, CLOSE_PRICE_NAME, \
+    PRE_SETTLE_PRICE_NAME, SETTLE_PRICE_NAME, OPEN_INTEREST_NAME, OI_CHG_NAME, \
+    VOLUME_NAME, TOTAL_ROW_KEY, COLUMN_NAMES
+
 from .xml_to_pandas_dataframe import xml_to_pandas_dataframe
+from .soup_to_pandas_dataframe import soup_to_pandas_dataframe
 from .logger import logger
 
 from abc import abstractclassmethod, ABCMeta
@@ -12,6 +18,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 import dateutil.parser as date_parser
 import pandas as pd
+import numpy as np
 
 
 #----------------------------------------------------------------------
@@ -37,20 +44,76 @@ class CSV_WRITE_MODE(Enum):
 FIX_FILE_PATTERN = re.compile(r'\^|\=')
 
 
+GB_ENCODING = 'gb18030'
+
+
 #----------------------------------------------------------------------
 def get_content_json(response):
     return json.loads(response.text)
 
 
 #----------------------------------------------------------------------
-def get_content_soup(response):
-    return BeautifulSoup(response.text, 'html.parser')
+def get_content_soup(response, encoding: str = None):
+    return BeautifulSoup(response.content, 'html.parser', from_encoding = encoding)
+
+
+#----------------------------------------------------------------------
+def get_table_soup(response, encoding: str = None):
+    soup = get_content_soup(response, encoding)
+    df = soup_to_pandas_dataframe(soup)
+    return df
 
 
 #----------------------------------------------------------------------
 def get_content_xml(response, columns: list, row_name: str):
     df = xml_to_pandas_dataframe(response.text, columns, row_name)
     return df
+
+
+#----------------------------------------------------------------------
+def to_numeric(df: pd.DataFrame, column: str, to_type: type = float):
+    """"""
+    # parse price
+    df[column] = df[column].str.replace(',', '', regex = True).astype(to_type)
+    return df
+
+
+#----------------------------------------------------------------------
+def normalize_history_data(df: pd.DataFrame, final_key: str = u'总计'):
+    """"""
+    # drop unexpected columns
+    df = df[COLUMN_NAMES]
+    # clear the final rows
+    df = df[df[PRODUCT_ID_NAME] != final_key]
+    # clear empty open interest
+    df = df[df[OPEN_INTEREST_NAME].notnull()]
+    df = to_numeric(df, OPEN_INTEREST_NAME, int)
+    df = df[df[OPEN_INTEREST_NAME] > 0]
+    # normalize price
+    df = df.replace('', '0', regex = True)
+    df = to_numeric(df, CLOSE_PRICE_NAME)
+    df = to_numeric(df, PRE_SETTLE_PRICE_NAME)
+    df = to_numeric(df, SETTLE_PRICE_NAME)
+    df = to_numeric(df, OPEN_PRICE_NAME)
+    df = to_numeric(df, HIGH_PRICE_NAME)
+    df = to_numeric(df, LOW_PRICE_NAME)
+    df = to_numeric(df, OI_CHG_NAME, int)
+    df = to_numeric(df, VOLUME_NAME, int)
+    return df
+
+
+#----------------------------------------------------------------------
+def calculate_index(df_in: pd.DataFrame, total_key: str = TOTAL_ROW_KEY):
+    """calculate the index, weighted average close price by open interest"""
+    # https://stackoverflow.com/questions/31521027/groupby-weighted-average-and-sum-in-pandas-dataframe
+    # https://stackoverflow.com/questions/26205922/calculate-weighted-average-using-a-pandas-dataframe
+    df = df_in[df_in[PRODUCT_ID_NAME] != TOTAL_ROW_KEY]
+    wm = lambda x: np.average(x[CLOSE_PRICE_NAME], weights = x[OPEN_INTEREST_NAME])
+    group = df.groupby(PRODUCT_GROUP_NAME).apply(wm)
+    df_in[CLOSE_PRICE_NAME] = np.where(df_in[PRODUCT_ID_NAME] == total_key,
+                                       round(group[df_in[PRODUCT_GROUP_NAME]], 3),
+                                       df_in[CLOSE_PRICE_NAME])
+    return df_in
 
 
 #----------------------------------------------------------------------
@@ -305,6 +368,49 @@ class RemoteHttpSHFEData(IRemoteHttpData):
 
 
 #----------------------------------------------------------------------
+class RemoteHttpCZCEData(IRemoteHttpData):
+
+    # http://www.czce.com.cn/cn/DFSStaticFiles/Future/2021/20210105/FutureDataDaily.htm
+    remote_path = "http://www.czce.com.cn/cn/DFSStaticFiles/Future/%s/%s/FutureDataDaily.htm"
+
+    #----------------------------------------------------------------------
+    def get_remote_path(self, date: str):
+        """query the remote data"""
+        str_list = date.split('-')
+        req_date = ''.join(str_list)
+        return self.remote_path % (str_list[0], req_date)
+
+    #----------------------------------------------------------------------
+    def do_data_handle(self, data, date_str: str):
+        """"""
+        df = get_table_soup(data, GB_ENCODING)
+        df[INDEX_KEY] = date_str
+        df.set_index(INDEX_KEY, inplace = True)
+        df.rename({
+            u'品种月份' : PRODUCT_ID_NAME,
+            u'昨结算'  : PRE_SETTLE_PRICE_NAME,
+            u'今开盘'  : OPEN_PRICE_NAME,
+            u'最高价'  : HIGH_PRICE_NAME,
+            u'最低价'  : LOW_PRICE_NAME,
+            u'今收盘'  : CLOSE_PRICE_NAME,
+            u'今结算'  : SETTLE_PRICE_NAME,
+            u'持仓量'  : OPEN_INTEREST_NAME,
+            # old name of open interest
+            u'空盘量'  : OPEN_INTEREST_NAME,
+            u'增减量'  : OI_CHG_NAME,
+            u'成交量(手)': VOLUME_NAME}, axis = 1, inplace = True)
+        # replace the total row's key name
+        df[PRODUCT_ID_NAME] = df[PRODUCT_ID_NAME].str.replace(u'小计', TOTAL_ROW_KEY, regex = True)
+        # get the group name by product id
+        df[PRODUCT_GROUP_NAME] = df[PRODUCT_ID_NAME].str.replace('\d+', '', regex = True)
+        df[PRODUCT_GROUP_NAME] = np.where(df[PRODUCT_GROUP_NAME] == TOTAL_ROW_KEY,
+                                          df[PRODUCT_GROUP_NAME].shift(1), df[PRODUCT_GROUP_NAME])
+        df = normalize_history_data(df, u'总计')
+        df = calculate_index(df)
+        return df
+
+
+#----------------------------------------------------------------------
 class RemoteDataFactory():
 
     data_path = ''
@@ -325,6 +431,8 @@ class RemoteDataFactory():
             data_class = RemoteHttpCFFETradingCalendar
         elif SYNC_DATA_MODE.HTTP_DOWNLOAD_SHFE == via:
             data_class = RemoteHttpSHFEData
+        elif SYNC_DATA_MODE.HTTP_DOWNLOAD_CZCE == via:
+            data_class = RemoteHttpCZCEData
         if data_class != None:
             return data_class(self.data_path, local, dates)
         raise NotImplementedError

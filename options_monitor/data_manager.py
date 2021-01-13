@@ -113,3 +113,15 @@ class SHFEDataManager(DataManager):
     def analyze(self):
         """analyze the data"""
         pass
+
+
+#----------------------------------------------------------------------
+class CZCEDataManager(DataManager):
+
+    data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_CZCE
+    local = 'czce'
+
+    #----------------------------------------------------------------------
+    def analyze(self):
+        """analyze the data"""
+        pass
