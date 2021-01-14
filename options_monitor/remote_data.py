@@ -74,7 +74,18 @@ def get_content_xml(response, columns: list, row_name: str):
 def to_numeric(df: pd.DataFrame, column: str, to_type: type = float):
     """"""
     # parse price
-    df[column] = df[column].str.replace(',', '', regex = True).astype(to_type)
+    try:
+        to = df[column].astype(to_type)
+    except ValueError:
+        to = df[column].str.replace(',', '', regex = True).astype(to_type)
+    df[column] = to
+    return df
+
+
+#----------------------------------------------------------------------
+def normalize_total_key(df: pd.DataFrame, key: str):
+    """"""
+    df[PRODUCT_ID_NAME] = df[PRODUCT_ID_NAME].str.replace(key, TOTAL_ROW_KEY, regex = True)
     return df
 
 
@@ -84,13 +95,14 @@ def normalize_history_data(df: pd.DataFrame, final_key: str = u'总计'):
     # drop unexpected columns
     df = df[COLUMN_NAMES]
     # clear the final rows
-    df = df[df[PRODUCT_ID_NAME] != final_key]
+    df = df[(df[PRODUCT_ID_NAME] != final_key) & (df[PRODUCT_GROUP_NAME] != final_key)]
+    df[PRODUCT_GROUP_NAME] = df[PRODUCT_GROUP_NAME].str.strip()
     # clear empty open interest
     df = df[df[OPEN_INTEREST_NAME].notnull()]
+    df.replace('', '0', regex = True, inplace = True)
     df = to_numeric(df, OPEN_INTEREST_NAME, int)
     df = df[df[OPEN_INTEREST_NAME] > 0]
     # normalize price
-    df = df.replace('', '0', regex = True)
     df = to_numeric(df, CLOSE_PRICE_NAME)
     df = to_numeric(df, PRE_SETTLE_PRICE_NAME)
     df = to_numeric(df, SETTLE_PRICE_NAME)
@@ -363,7 +375,22 @@ class RemoteHttpSHFEData(IRemoteHttpData):
         df = pd.json_normalize(data_list)
         df[INDEX_KEY] = date_str
         df.set_index(INDEX_KEY, inplace = True)
-        df.rename(columns = {'CLOSEPRICE': CLOSE_PRICE_NAME}, inplace = True)
+        df.rename(columns = {
+            'DELIVERYMONTH' : PRODUCT_ID_NAME,
+            'PRODUCTID'   : PRODUCT_GROUP_NAME,
+            'PRESETTLEMENTPRICE' : PRE_SETTLE_PRICE_NAME,
+            'OPENPRICE'   : OPEN_PRICE_NAME,
+            'HIGHESTPRICE': HIGH_PRICE_NAME,
+            'LOWESTPRICE' : LOW_PRICE_NAME,
+            'CLOSEPRICE'  : CLOSE_PRICE_NAME,
+            'SETTLEMENTPRICE': SETTLE_PRICE_NAME,
+            'OPENINTEREST': OPEN_INTEREST_NAME,
+            'OPENINTERESTCHG': OI_CHG_NAME,
+            'VOLUME'      : VOLUME_NAME}, inplace = True)
+        # replace the total row's key name
+        df = normalize_total_key(df, u'小计')
+        df = normalize_history_data(df, u'总计')
+        df = calculate_index(df)
         return df
 
 
@@ -400,7 +427,7 @@ class RemoteHttpCZCEData(IRemoteHttpData):
             u'增减量'  : OI_CHG_NAME,
             u'成交量(手)': VOLUME_NAME}, axis = 1, inplace = True)
         # replace the total row's key name
-        df[PRODUCT_ID_NAME] = df[PRODUCT_ID_NAME].str.replace(u'小计', TOTAL_ROW_KEY, regex = True)
+        df = normalize_total_key(df, u'小计')
         # get the group name by product id
         df[PRODUCT_GROUP_NAME] = df[PRODUCT_ID_NAME].str.replace('\d+', '', regex = True)
         df[PRODUCT_GROUP_NAME] = np.where(df[PRODUCT_GROUP_NAME] == TOTAL_ROW_KEY,
