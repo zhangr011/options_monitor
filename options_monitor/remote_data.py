@@ -58,9 +58,9 @@ def get_content_soup(response, encoding: str = None):
 
 
 #----------------------------------------------------------------------
-def get_table_soup(response, encoding: str = None):
+def get_table_soup(response, encoding: str = None, thead_tbody: bool = True):
     soup = get_content_soup(response, encoding)
-    df = soup_to_pandas_dataframe(soup)
+    df = soup_to_pandas_dataframe(soup, thead_tbody)
     return df
 
 
@@ -77,7 +77,8 @@ def to_numeric(df: pd.DataFrame, column: str, to_type: type = float):
     try:
         to = df[column].astype(to_type)
     except ValueError:
-        to = df[column].str.replace(',', '', regex = True).astype(to_type)
+        to = df[column].str.replace('^-$', '0', regex = True)
+        to = to.str.replace(',', '', regex = True).astype(to_type)
     df[column] = to
     return df
 
@@ -133,6 +134,7 @@ class IRemoteHttpData(metaclass = ABCMeta):
 
     remote_path = ""
     csv_mode = CSV_WRITE_MODE.APPEND
+    request_post = False
 
     def __init__(self, data_path: str, local: str, dates: pd.Index):
         """Constructor"""
@@ -241,9 +243,14 @@ class IRemoteHttpData(metaclass = ABCMeta):
     #----------------------------------------------------------------------
     def do_query_remote(self, date_str: str):
         """query the remote data"""
-        url = self.get_remote_path(date_str)
+
         try:
-            response = requests.get(url)
+            if self.request_post:
+                url, data = self.get_remote_path(date_str)
+                response = requests.post(url, json = data)
+            else:
+                url = self.get_remote_path(date_str)
+                response = requests.get(url)
             response.raise_for_status()
             return response
         except Exception as e:
@@ -395,6 +402,52 @@ class RemoteHttpSHFEData(IRemoteHttpData):
 
 
 #----------------------------------------------------------------------
+class RemoteHttpDCEData(IRemoteHttpData):
+
+    # http://www.dce.com.cn/publicweb/quotesdata/dayQuotesCh.html
+    remote_path = "http://www.dce.com.cn/publicweb/quotesdata/dayQuotesCh.html"
+    request_post = True
+
+    #----------------------------------------------------------------------
+    def get_remote_path(self, date: str):
+        """query the remote data"""
+        date_list = date.split('-')
+        data = {'dayQuotes':{'variety':'all', 'trade_type':0},
+                'year':date_list[0],
+                'month':int(date_list[1]) - 1,
+                'day':date_list[2]}
+        return self.remote_path, data
+
+    #----------------------------------------------------------------------
+    def do_data_handle(self, data, date_str: str):
+        """"""
+        df = get_table_soup(data, GB_ENCODING, False)
+        df[INDEX_KEY] = date_str
+        df.set_index(INDEX_KEY, inplace = True)
+        df.rename({
+            u'交割月份' : PRODUCT_ID_NAME,
+            u'商品名称' : PRODUCT_GROUP_NAME,
+            u'前结算价' : PRE_SETTLE_PRICE_NAME,
+            u'开盘价'   : OPEN_PRICE_NAME,
+            u'最高价'   : HIGH_PRICE_NAME,
+            u'最低价'   : LOW_PRICE_NAME,
+            u'收盘价'   : CLOSE_PRICE_NAME,
+            u'结算价'   : SETTLE_PRICE_NAME,
+            u'持仓量'   : OPEN_INTEREST_NAME,
+            u'持仓量变化' : OI_CHG_NAME,
+            u'成交量'   : VOLUME_NAME}, axis = 1, inplace = True)
+        # replace the total row's key name
+        df[PRODUCT_ID_NAME] = np.where(
+            df[PRODUCT_GROUP_NAME].str.contains(u'小计', regex = True),
+            TOTAL_ROW_KEY, df[PRODUCT_ID_NAME])
+        df = normalize_history_data(df, u'总计')
+        # clear the group name
+        df[PRODUCT_GROUP_NAME] = df[PRODUCT_GROUP_NAME].str.replace(u'小计', '', regex = True)
+        df = calculate_index(df)
+        return df
+
+
+#----------------------------------------------------------------------
 class RemoteHttpCZCEData(IRemoteHttpData):
 
     # http://www.czce.com.cn/cn/DFSStaticFiles/Future/2021/20210105/FutureDataDaily.htm
@@ -458,6 +511,8 @@ class RemoteDataFactory():
             data_class = RemoteHttpCFFETradingCalendar
         elif SYNC_DATA_MODE.HTTP_DOWNLOAD_SHFE == via:
             data_class = RemoteHttpSHFEData
+        elif SYNC_DATA_MODE.HTTP_DOWNLOAD_DCE == via:
+            data_class = RemoteHttpDCEData
         elif SYNC_DATA_MODE.HTTP_DOWNLOAD_CZCE == via:
             data_class = RemoteHttpCZCEData
         if data_class != None:

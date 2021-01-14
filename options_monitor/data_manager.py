@@ -116,6 +116,18 @@ class SHFEDataManager(DataManager):
 
 
 #----------------------------------------------------------------------
+class DCEDataManager(DataManager):
+
+    data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_DCE
+    local = 'dce'
+
+    #----------------------------------------------------------------------
+    def analyze(self):
+        """analyze the data"""
+        pass
+
+
+#----------------------------------------------------------------------
 class CZCEDataManager(DataManager):
 
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_CZCE
