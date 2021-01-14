@@ -48,9 +48,6 @@ COLUMN_NAMES = [PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, PRE_SETTLE_PRICE_NAME,
                 OPEN_PRICE_NAME, HIGH_PRICE_NAME, LOW_PRICE_NAME, CLOSE_PRICE_NAME, SETTLE_PRICE_NAME,
                 OPEN_INTEREST_NAME, OI_CHG_NAME, VOLUME_NAME]
 
-# about 3 years
-HV_DISTRIBUTION_PERIODS = 260 * 3
-
 # markdown head and \n replace
 MD_HEAD_PATTERN = re.compile(r'\|(:?-{3,}:?\|){4,}\n')
 MD_FORMAT_PATTERN = re.compile(r'\n')
@@ -215,57 +212,6 @@ def close_ma5_ma10_ma20(df: pd.DataFrame):
     df['ma10'] = ma10
     df['ma20'] = ma20
     return df
-
-
-#----------------------------------------------------------------------
-def index_distribution_of_per(size: int):
-    """calculate the index to split a list"""
-    min_delta = int(np.floor(size / 100))
-    remain = size - min_delta * 100
-    # remain to the bottom
-    li = []
-    for idx in range(99):
-        delta = min_delta
-        if remain > 0:
-            delta += 1
-            remain -= 1
-        if 0 == idx:
-            li.append(delta)
-        else:
-            li.append(li[-1] + delta)
-    return li
-
-
-#----------------------------------------------------------------------
-def percent_distribution_list(hvs: pd.Series):
-    """calculate the percentage value list"""
-    sorted_hvs = hvs.dropna().sort_values()
-    size = sorted_hvs.shape[0]
-    if size < HV_DISTRIBUTION_PERIODS:
-        # not enough size,  return empty list
-        return []
-    else:
-        sorted_hvs = sorted_hvs[-HV_DISTRIBUTION_PERIODS:]
-        idxes = index_distribution_of_per(HV_DISTRIBUTION_PERIODS)
-        return map(lambda idx: sorted_hvs.iloc[idx], idxes)
-
-
-#----------------------------------------------------------------------
-def percent_distribution(vix: pd.Series, val: float = None):
-    """calculate the percentage of the value at"""
-    dis = percent_distribution_list(vix)
-    if [] == dis:
-        # not enough distribution, return 50
-        return 50
-    if val is None:
-        val = vix.iloc[-1]
-    ret = 0
-    for tval in dis:
-        if val > tval:
-            ret += 1
-        else:
-            break
-    return ret
 
 
 #----------------------------------------------------------------------

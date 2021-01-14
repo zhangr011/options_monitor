@@ -29,12 +29,15 @@ class MonitorScheduleManager(ScheduleManager):
         dce_mgr = SHFEDataManager(dates)
         czce_mgr = CZCEDataManager(dates)
         requests = threadpool.makeRequests(
-            lambda x: x.download_raw_data,
+            lambda x: x.download_raw_data(),
             [csindex000300_mgr, cffe_mgr, shfe_mgr, dce_mgr, czce_mgr])
         pool = threadpool.ThreadPool(self.pool_size)
         [pool.putRequest(req) for req in requests]
         pool.wait()
         logger.info('all data downloaded. ')
+        csindex300_df = csindex000300_mgr.analyze()
+        import pdb
+        pdb.set_trace()
         logger.info('schedule task done. ')
         return self.clear_and_return_true()
 

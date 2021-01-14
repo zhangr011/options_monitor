@@ -1,7 +1,10 @@
 # encoding: UTF-8
 
 from .utilities import \
-    make_sure_dirs_exist, DATA_ROOT, DATE_FORMAT, sse_calendar
+    make_sure_dirs_exist, DATA_ROOT, DATE_FORMAT, sse_calendar, \
+    CLOSE_PRICE_NAME
+from .utilities_hv import HV_20_NAME, HV_250_NAME, HV_20_250_NAME, HV_PER, \
+    HV_DISTRIBUTION_PERIODS, historical_volatility, calc_percentage
 from .remote_data import RemoteDataFactory, SYNC_DATA_MODE
 from .logger import logger
 from functools import cached_property
@@ -37,7 +40,12 @@ class DataManager():
     #----------------------------------------------------------------------
     def analyze(self):
         """analyze the data"""
-        raise NotImplementedError
+        lindex, df = self._remote_data.get_last_index()
+        df[HV_20_NAME] = historical_volatility(df[CLOSE_PRICE_NAME], 20)
+        df[HV_250_NAME] = historical_volatility(df[CLOSE_PRICE_NAME], 250)
+        df[HV_20_250_NAME] = df[HV_20_NAME] / df[HV_250_NAME]
+        df[HV_PER] = calc_percentage(df[HV_20_NAME])
+        return df
 
 
 #----------------------------------------------------------------------
@@ -45,11 +53,6 @@ class CSIndex000300DataManager(DataManager):
 
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_CSINDEX_000300
     local = 'csindex_000300'
-
-    #----------------------------------------------------------------------
-    def analyze(self):
-        """analyze the data"""
-        pass
 
 
 #----------------------------------------------------------------------
