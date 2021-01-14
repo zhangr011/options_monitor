@@ -16,7 +16,6 @@ from enum import Enum
 import os, re, json, traceback, urllib, urllib3, requests, http, time
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
-import dateutil.parser as date_parser
 import pandas as pd
 import numpy as np
 

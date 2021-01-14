@@ -3,10 +3,12 @@
 from options_monitor.utilities import get_last_trade_dates, SCHEDULE_HOUR
 from options_monitor.schedule_manager import ScheduleManager
 from options_monitor.util_dingding import send_md_msg
-from options_monitor.data_manager import CSIndex000300DataManager
+from options_monitor.data_manager import \
+    CSIndex000300DataManager, CFFEDataManager, SHFEDataManager, \
+    DCEDataManager, CZCEDataManager
 from options_monitor.logger import logger
-from datetime import datetime, timezone
 from time import sleep
+import threadpool
 
 
 #----------------------------------------------------------------------
@@ -15,12 +17,24 @@ class MonitorScheduleManager(ScheduleManager):
     # UTC+8
     _crontab = f'05 {SCHEDULE_HOUR} * * *'
     _day_index = None
+    pool_size = 10
 
     def do_timeout(self):
         """"""
-        dates = get_last_year_trade_dates()
-        csindex000300_mgr = CSIndex000300DataManager(dates)
         logger.info('start schedule task. ')
+        dates = get_last_trade_dates()
+        csindex000300_mgr = CSIndex000300DataManager(dates)
+        cffe_mgr = CFFEDataManager(dates)
+        shfe_mgr = SHFEDataManager(dates)
+        dce_mgr = SHFEDataManager(dates)
+        czce_mgr = CZCEDataManager(dates)
+        requests = threadpool.makeRequests(
+            lambda x: x.download_raw_data,
+            [csindex000300_mgr, cffe_mgr, shfe_mgr, dce_mgr, czce_mgr])
+        pool = threadpool.ThreadPool(self.pool_size)
+        [pool.putRequest(req) for req in requests]
+        pool.wait()
+        logger.info('all data downloaded. ')
         logger.info('schedule task done. ')
         return self.clear_and_return_true()
 
@@ -31,7 +45,7 @@ class MonitorScheduleManager(ScheduleManager):
 
 
 if __name__ == '__main__':
-    mgr = MonitorScheduleManager(False)
-    logger.info('cboe monitor started. ')
+    mgr = MonitorScheduleManager(True)
+    logger.info('options monitor started. ')
     while True:
         sleep(1)
