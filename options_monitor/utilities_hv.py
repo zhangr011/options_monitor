@@ -4,9 +4,9 @@ import pandas as pd
 import numpy as np
 
 
-HV_20_NAME = 'hv_20'
-HV_250_NAME = 'hv_250'
-HV_20_250_NAME = 'hv_20_250'
+HV_20_NAME = 'hv20'
+HV_250_NAME = 'hv250'
+HV_20_250_NAME = 'hv20/250'
 HV_PER = 'per'
 # about 1 years
 HV_DISTRIBUTION_PERIODS = 250

@@ -2,7 +2,7 @@
 
 from .utilities import \
     make_sure_dirs_exist, DATA_ROOT, DATE_FORMAT, sse_calendar, \
-    CLOSE_PRICE_NAME
+    PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, CLOSE_PRICE_NAME, TOTAL_ROW_KEY
 from .utilities_hv import HV_20_NAME, HV_250_NAME, HV_20_250_NAME, HV_PER, \
     HV_DISTRIBUTION_PERIODS, historical_volatility, calc_percentage
 from .remote_data import RemoteDataFactory, SYNC_DATA_MODE
@@ -37,15 +37,33 @@ class DataManager():
         self._remote_data.sync_data()
         logger.info('all data downloaded. ')
 
+
     #----------------------------------------------------------------------
-    def analyze(self):
-        """analyze the data"""
-        lindex, df = self._remote_data.get_last_index()
+    def analyze_one_hv(self, df: pd.DataFrame):
+        """analyze the hv of on product based on index"""
         df[HV_20_NAME] = historical_volatility(df[CLOSE_PRICE_NAME], 20)
         df[HV_250_NAME] = historical_volatility(df[CLOSE_PRICE_NAME], 250)
         df[HV_20_250_NAME] = df[HV_20_NAME] / df[HV_250_NAME]
         df[HV_PER] = calc_percentage(df[HV_20_NAME])
         return df
+
+    #----------------------------------------------------------------------
+    def analyze(self):
+        """analyze the data"""
+        products = self.get_products_dataframe()
+        dfs = map(lambda df: self.analyze_one_hv(df), products)
+        return list(dfs)
+
+    #----------------------------------------------------------------------
+    def get_products_dataframe(self):
+        """get the products' dataframe"""
+        lindex, df = self._remote_data.get_last_index()
+        df = df[df[PRODUCT_ID_NAME] == TOTAL_ROW_KEY]
+        group = df.groupby(PRODUCT_GROUP_NAME)
+        dfs = []
+        for pid in group.groups.keys():
+            dfs.append(group.get_group(pid))
+        return dfs
 
 
 #----------------------------------------------------------------------
@@ -53,6 +71,12 @@ class CSIndex000300DataManager(DataManager):
 
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_CSINDEX_000300
     local = 'csindex_000300'
+
+    #----------------------------------------------------------------------
+    def get_products_dataframe(self):
+        """"""
+        lindex, df = self._remote_data.get_last_index()
+        return [df]
 
 
 #----------------------------------------------------------------------
@@ -100,22 +124,12 @@ class CFFEDataManager(DataManager):
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_CFFE
     local = 'cffe'
 
-    #----------------------------------------------------------------------
-    def analyze(self):
-        """analyze the data"""
-        pass
-
 
 #----------------------------------------------------------------------
 class SHFEDataManager(DataManager):
 
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_SHFE
     local = 'shfe'
-
-    #----------------------------------------------------------------------
-    def analyze(self):
-        """analyze the data"""
-        pass
 
 
 #----------------------------------------------------------------------
@@ -124,19 +138,9 @@ class DCEDataManager(DataManager):
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_DCE
     local = 'dce'
 
-    #----------------------------------------------------------------------
-    def analyze(self):
-        """analyze the data"""
-        pass
-
 
 #----------------------------------------------------------------------
 class CZCEDataManager(DataManager):
 
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_CZCE
     local = 'czce'
-
-    #----------------------------------------------------------------------
-    def analyze(self):
-        """analyze the data"""
-        pass

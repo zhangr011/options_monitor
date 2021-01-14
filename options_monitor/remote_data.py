@@ -167,6 +167,16 @@ class IRemoteHttpData(metaclass = ABCMeta):
             return None, None
 
     #----------------------------------------------------------------------
+    def drop_local_last_date_data(self):
+        """clear the last date data"""
+        lindex, df = self.get_last_index()
+        if lindex:
+            index_names = df[df.index == lindex].index
+            df.drop(index = index_names, inplace = True)
+            df.to_csv(path_or_buf = self.get_local_path())
+            logger.info(f'data of {lindex} has been dropped. ')
+
+    #----------------------------------------------------------------------
     def sync_data(self):
         """sync the data if needed. """
         try:

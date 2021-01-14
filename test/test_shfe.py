@@ -13,6 +13,9 @@ class TestSHFEDataManager(ut.TestCase):
         dates = get_last_trade_dates()
         mgr = SHFEDataManager(dates)
         mgr.download_raw_data()
+        dfs = mgr.analyze()
+        # mgr._remote_data.drop_local_last_date_data()
+        pass
 
 
 if __name__ == '__main__':
