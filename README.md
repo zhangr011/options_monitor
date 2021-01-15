@@ -3,6 +3,23 @@
 
 从各大交易所获取期货和期权数据，计算期货历史波动率，计算期权综合隐含波动率。
 
+## 使用方法
+```bash
+pip3 install -r ./requirements.txt
+pip3 install .
+# copy and edit your push.ini if needed.
+cp ./data/push.back.ini ./data/push.ini
+# start the monitor at back
+bash ./start_monitor.sh restart &
+# check if any error occurred
+tail ./nohup.out
+
+## 开发计划
+### 已完成
+#### 0.2.0 从交易所获取 k 线数据
+#### 0.4.0 商品指数计算
+#### 0.6.0 历史波动率计算
+
 ## 数据获取方式
 
 | 各交易所数据获取方式 | |
