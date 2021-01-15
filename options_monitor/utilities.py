@@ -352,8 +352,10 @@ def mk_notification(df: pd.DataFrame):
     df = df[df[PRODUCT_GROUP_NAME].notnull()]
     df.set_index(PRODUCT_GROUP_NAME, inplace = True)
     df.index.rename('name', inplace = True)
-    df = df.applymap(lambda x: f"{x:.1%}".strip('%') if isinstance(x, float) else x)
-    content = f'{notify_format(df)}'
+    df.drop([HV_250_NAME], axis = 1, inplace = True)
+    df2 = df.applymap(lambda x: f"{x:.1%}".strip('%') if isinstance(x, float) else x)
+    df2[HV_PER] = df[HV_PER]
+    content = f'{notify_format(df2)}'
     return notify_format_content(content)
 
 
