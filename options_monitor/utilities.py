@@ -42,6 +42,13 @@ OPEN_INTEREST_NAME = 'OI'
 OI_CHG_NAME = 'OIChange'
 VOLUME_NAME = 'Volume'
 
+# hv key
+HV_20_NAME = 'hvm'
+HV_250_NAME = 'hvy'
+HV_20_250_NAME = 'hvm/y'
+HV_PER = 'per'
+
+# total key for future's index
 TOTAL_ROW_KEY = 'total'
 
 COLUMN_NAMES = [PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, PRE_SETTLE_PRICE_NAME,
@@ -52,6 +59,69 @@ COLUMN_NAMES = [PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, PRE_SETTLE_PRICE_NAME,
 MD_HEAD_PATTERN = re.compile(r'\|(:?-{3,}:?\|){4,}\n')
 MD_FORMAT_PATTERN = re.compile(r'\n')
 MD_FORMAT_TO = r'\n\n'
+
+# futures names for hv notification
+FUTURE_HV_NAMES = {
+    # cs
+    'csidx300' : '300',
+    # shfe
+    'cu_f' : u'沪铜',
+    'al_f' : u'沪铝',
+    'zn_f' : u'沪锌',
+    # 'pb_f' : u'',
+    'ni_f' : u'沪镍',
+    'sn_f' : u'沪锡',
+    'au_f' : u'沪金',
+    'ag_f' : u'沪银',
+    'rb_f' : u'螺纹',
+    'hc_f' : u'热卷',
+    'ss_f' : u'ss',
+    # 'sc_f' : u'',
+    'fu_f' : u'燃油',
+    'bu_f' : u'沥青',
+    'ru_f' : u'橡胶',
+    'nr_f' : u'20胶',
+    'sp_f' : u'纸浆',
+    # DCE
+    u'豆一' : u'豆一',
+    u'玉米' : u'玉米',
+    u'苯乙烯' : u'EB',
+    u'乙二醇' : u'eg',
+    u'铁矿石' : u'铁',
+    u'焦炭' : u'焦炭',
+    u'鸡蛋' : u'鸡蛋',
+    u'焦煤' : u'焦煤',
+    u'聚乙烯' : u'塑料',
+    u'生猪' : u'生猪',
+    u'豆粕' : u'豆粕',
+    u'棕榈油' : u'棕榈',
+    u'液化石油气' : u'LPG',
+    u'聚丙烯' : u'pp',
+    u'粳米' : u'粳米',
+    u'聚氯乙烯' : u'pvc',
+    u'豆油' : u'豆油',
+    # CZCE
+    'AP' : u'苹果',
+    'CF' : u'郑棉',
+    # 'CJ' : u'',
+    # 'CY' : u'',
+    'FG' : u'玻璃',
+    # 'LR' : u'',
+    'MA' : u'郑醇',
+    'OI' : u'郑油',
+    # 'PM' : u'',
+    # 'RI' : u'',
+    'RM' : u'菜粕',
+    # 'RS' : u'',
+    # 'SA' : u'',
+    # 'SF' : u'',
+    # 'SM' : u'',
+    # 'SR' : u'',
+    'TA' : u'TA',
+    'UR' : u'尿素',
+    # 'WH' : u'',
+    'ZC' : u'动煤'
+}
 
 
 #----------------------------------------------------------------------
@@ -219,8 +289,8 @@ def format_index(df: pd.DataFrame, delivery_dates: list = []):
     """format the index of DataFrame"""
     if delivery_dates != []:
         df['d'] = df.apply(lambda row: 'd' if row.name in delivery_dates else '', axis = 1)
-    df.index = df.index.str.replace(r'\d{4}-', '')
-    df.index = df.index.str.replace('-', '')
+    df.index = df.index.str.replace(r'\d{4}-', '', regex = True)
+    df.index = df.index.str.replace('-', '', regex = True)
     df.index.rename('Date', inplace = True)
 
 
@@ -260,19 +330,6 @@ def historical_max_min_per(df: pd.DataFrame):
 
 
 #----------------------------------------------------------------------
-def mk_notification_params(vix_futures: pd.DataFrame,
-                           delivery_dates: list,
-                           rets_vix: dict,
-                           rets_gvz: dict, rets_ovx: dict):
-    """make the notification's params"""
-    rets = {'vix_futures': vix_futures, 'delivery_dates': delivery_dates}
-    rets.update(rets_vix)
-    rets.update(rets_gvz)
-    rets.update(rets_ovx)
-    return rets
-
-
-#----------------------------------------------------------------------
 def notify_format(df: pd.DataFrame):
     """format the dataframe for notification"""
     return df.to_markdown()
@@ -288,43 +345,16 @@ def notify_format_content(content: str):
 
 
 #----------------------------------------------------------------------
-def mk_notification(vix_futures: pd.DataFrame,
-                    delivery_dates: list,
-                    vix_diff: pd.DataFrame,
-                    vix: pd.DataFrame,
-                    gvz: pd.DataFrame = None,
-                    ovx: pd.DataFrame = None):
+def mk_notification(df: pd.DataFrame):
     """make the notification msg from the params"""
-    if np.alltrue(vix_diff.iloc[-5:][1] > 0.02):
-        per_msg = 'vix 2/1 is safe now. '
-    elif np.any(vix_diff.iloc[-5:][1] < -0.02):
-        per_msg = 'vix 2/1 warning!!!! '
-    else:
-        per_msg = 'vix is ok. '
-    # combine the result
-    futures_521 = vix_futures.iloc[-5:, [0, 1]]
-    vix_diff_51 = vix_diff.iloc[-5:, [0]]
-    futures_521 = futures_521.applymap(lambda x: f"{x:.1f}")
-    futures_521['f2/1'] = vix_diff_51[1].apply(lambda x: f"{x:.1%}")
-    # clear the year info of Trade Date
-    format_index(futures_521, delivery_dates)
-    # calculate the vix percentage
-    vix_51, vmax, vmin = calc_percentage(vix)
-    # calculate the gvz percentage
-    gvz_51, gmax, gmin = calc_percentage(gvz)
-    # calculate the ovx percentage
-    ovx_51, omax, omin = calc_percentage(ovx)
-    content = f"""{notify_format(futures_521)}
-------------------------
-#### **vix:** {vmin:.2f} - {vmax:.2f}
-{notify_format(vix_51)}
-------------------------
-#### **gvz:** {gmin:.2f} - {gmax:.2f}
-{notify_format(gvz_51)}
-------------------------
-#### **ovx:** {omin:.2f} - {omax:.2f}
-{notify_format(ovx_51)}"""
-    return per_msg, notify_format_content(content)
+    # drop the index
+    df[PRODUCT_GROUP_NAME] = df[PRODUCT_GROUP_NAME].apply(lambda x: FUTURE_HV_NAMES.get(x, np.nan))
+    df = df[df[PRODUCT_GROUP_NAME].notnull()]
+    df.set_index(PRODUCT_GROUP_NAME, inplace = True)
+    df.index.rename('name', inplace = True)
+    df = df.applymap(lambda x: f"{x:.1%}".strip('%') if isinstance(x, float) else x)
+    content = f'{notify_format(df)}'
+    return notify_format_content(content)
 
 
 #----------------------------------------------------------------------

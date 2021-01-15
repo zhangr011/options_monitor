@@ -252,11 +252,10 @@ class IRemoteHttpData(metaclass = ABCMeta):
     #----------------------------------------------------------------------
     def do_query_remote(self, date_str: str):
         """query the remote data"""
-
         try:
             if self.request_post:
                 url, data = self.get_remote_path(date_str)
-                response = requests.post(url, json = data)
+                response = requests.post(url, data)
             else:
                 url = self.get_remote_path(date_str)
                 response = requests.get(url)
@@ -306,10 +305,13 @@ class RemoteHttpCSIndex000300Data(IRemoteHttpData):
         """"""
         data_list = get_content_json(data)
         df = pd.json_normalize(data_list)
-        df.drop(['indx_code', 'changes'], axis = 1, inplace = True)
+        df.drop(['lclose', 'changes'], axis = 1, inplace = True)
         df.set_index(['tradedate'], inplace = True)
         df.index = df.index.str.replace(' 00:00:00', '')
-        df.rename(columns = {'tclose' : CLOSE_PRICE_NAME}, inplace = True)
+        df.rename(columns = {
+            'indx_code' : PRODUCT_GROUP_NAME,
+            'tclose' : CLOSE_PRICE_NAME}, inplace = True)
+        df[PRODUCT_GROUP_NAME] = 'csidx300'
         return df
 
 
@@ -421,10 +423,11 @@ class RemoteHttpDCEData(IRemoteHttpData):
     def get_remote_path(self, date: str):
         """query the remote data"""
         date_list = date.split('-')
-        data = {'dayQuotes':{'variety':'all', 'trade_type':0},
-                'year':date_list[0],
-                'month':int(date_list[1]) - 1,
-                'day':date_list[2]}
+        data = {'dayQuotes.variety': 'all',
+                'dayQuotes.trade_type': '0',
+                'year': date_list[0],
+                'month': str(int(date_list[1]) - 1),
+                'day': date_list[2]}
         return self.remote_path, data
 
     #----------------------------------------------------------------------

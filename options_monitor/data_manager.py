@@ -2,8 +2,9 @@
 
 from .utilities import \
     make_sure_dirs_exist, DATA_ROOT, DATE_FORMAT, sse_calendar, \
-    PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, CLOSE_PRICE_NAME, TOTAL_ROW_KEY
-from .utilities_hv import HV_20_NAME, HV_250_NAME, HV_20_250_NAME, HV_PER, \
+    PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, CLOSE_PRICE_NAME, TOTAL_ROW_KEY, \
+    HV_20_NAME, HV_250_NAME, HV_20_250_NAME, HV_PER
+from .utilities_hv import \
     HV_DISTRIBUTION_PERIODS, historical_volatility, calc_percentage
 from .remote_data import RemoteDataFactory, SYNC_DATA_MODE
 from .logger import logger

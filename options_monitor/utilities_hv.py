@@ -1,13 +1,11 @@
 # encoding: UTF-8
 
+from .utilities import PRODUCT_GROUP_NAME, CLOSE_PRICE_NAME, \
+    HV_20_NAME, HV_250_NAME, HV_20_250_NAME, HV_PER
 import pandas as pd
 import numpy as np
 
 
-HV_20_NAME = 'hv20'
-HV_250_NAME = 'hv250'
-HV_20_250_NAME = 'hv20/250'
-HV_PER = 'per'
 # about 1 years
 HV_DISTRIBUTION_PERIODS = 250
 
@@ -77,3 +75,20 @@ def percent_distribution(vix: pd.Series, val: float = None):
 def calc_percentage(hv_20: pd.Series):
     """"""
     return hv_20.rolling(HV_DISTRIBUTION_PERIODS).apply(lambda rows: percent_distribution(rows))
+
+
+#----------------------------------------------------------------------
+def sort_hv20250(dfs: list):
+    """df list"""
+    date = None
+    products = []
+    for idx, df in enumerate(dfs):
+        if 0 == idx:
+            date = df.index[-1]
+        products.append(df[df.index == date])
+    final = pd.concat(products)
+    final = final[[PRODUCT_GROUP_NAME, HV_20_NAME, HV_250_NAME, HV_20_250_NAME, HV_PER]]
+    final[HV_PER].fillna('', inplace = True)
+    final.dropna(inplace = True)
+    final.sort_values(by = HV_20_250_NAME, ascending = False, inplace = True)
+    return date, final

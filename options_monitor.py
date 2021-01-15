@@ -1,6 +1,7 @@
 # encoding: UTF-8
 
-from options_monitor.utilities import get_last_trade_dates, SCHEDULE_HOUR
+from options_monitor.utilities import get_last_trade_dates, SCHEDULE_HOUR, mk_notification
+from options_monitor.utilities_hv import sort_hv20250
 from options_monitor.schedule_manager import ScheduleManager
 from options_monitor.util_dingding import send_md_msg
 from options_monitor.data_manager import \
@@ -18,6 +19,7 @@ class MonitorScheduleManager(ScheduleManager):
     _crontab = f'05 {SCHEDULE_HOUR} * * *'
     _day_index = None
     pool_size = 10
+    _pushed_date = None
 
     def do_timeout(self):
         """"""
@@ -41,8 +43,11 @@ class MonitorScheduleManager(ScheduleManager):
         dce_dfs = dce_mgr.analyze()
         czce_dfs = czce_mgr.analyze()
         all_dfs = csindex300_dfs + shfe_dfs + dce_dfs + czce_dfs
-        import pdb
-        pdb.set_trace()
+        this_date, final_df = sort_hv20250(all_dfs)
+        if self._pushed_date != this_date:
+            md_msg = mk_notification(final_df)
+            send_md_msg(f'{this_date} hv', md_msg)
+            self._pushed_date = this_date
         logger.info('schedule task done. ')
         return self.clear_and_return_true()
 
