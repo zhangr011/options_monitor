@@ -13,12 +13,17 @@ cp ./data/push.back.ini ./data/push.ini
 bash ./start_monitor.sh restart &
 # check if any error occurred
 tail ./nohup.out
+```
 
 ## 开发计划
 ### 已完成
 #### 0.2.0 从交易所获取 k 线数据
 #### 0.4.0 商品指数计算
-#### 0.6.0 历史波动率计算
+#### 0.5.0 历史波动率计算
+#### 0.6.0 历史波动率百分位计算
+### 计划中
+#### 0.7.0 根据 hv20 / hv250 的相对百分比排序，并通过 dingding 通知
+#### 0.8.0 综合隐含波动率计算，综合隐含波动百分位计算
 
 ## 数据获取方式
 
