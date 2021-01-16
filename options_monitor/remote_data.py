@@ -218,7 +218,7 @@ class IRemoteHttpData(metaclass = ABCMeta):
         raw_data = self.do_query_remote(request_date)
         data = self.do_data_handle(raw_data, request_date)
         data.index.rename(INDEX_KEY, inplace = True)
-        print(data)
+        # print(data)
         # with index
         if ldf is None:
             data.to_csv(path_or_buf = self.get_local_path())
