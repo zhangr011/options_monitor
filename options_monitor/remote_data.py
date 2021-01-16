@@ -207,10 +207,7 @@ class IRemoteHttpData(metaclass = ABCMeta):
     #----------------------------------------------------------------------
     def do_sync_data(self, dates: list, ldf: pd.DataFrame):
         """sync the data"""
-        from .data_manager import calendar_manager
         for date in dates:
-            if calendar_manager.check_closed(date):
-                continue
             ldf = self.do_sync_data_one_by_one(date, ldf)
             time.sleep(0.5)
         return ldf

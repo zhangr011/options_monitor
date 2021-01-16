@@ -101,18 +101,20 @@ class CFFECalendarDataManager(DataManager):
         self._trade_dates = dates.strftime(DATE_FORMAT)
         self.download_raw_data()
         li, df = self._remote_data.get_last_index()
+        if df is None:
+            raise ValueError('calendar data download failed. ')
         return df
 
     #----------------------------------------------------------------------
-    def check_closed(self, date_str: str):
+    def check_open(self, date_str: str):
         """check if the market closed. """
         calendar = self.get_trading_calendar
         try:
             date_row = calendar.loc[date_str]
-            return date_row['closed']
+            return not date_row['closed']
         except KeyError:
             # not in the calendar, it's ok
-            return False
+            return True
 
 
 #----------------------------------------------------------------------

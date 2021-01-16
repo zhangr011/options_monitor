@@ -13,9 +13,12 @@ class TestCFFECalendarManager(ut.TestCase):
         calendar1 = calendar_manager.get_trading_calendar
         calendar2 = calendar_manager.get_trading_calendar
         self.assertEqual(calendar1.size, calendar2.size)
-        self.assertEqual(True, calendar_manager.check_closed('2018-01-01'))
-        self.assertEqual(False, calendar_manager.check_closed('2021-01-02'))
-        self.assertEqual(False, calendar_manager.check_closed('2021-01-04'))
+        self.assertEqual(False, calendar_manager.check_open('2018-01-01'))
+        self.assertEqual(False, calendar_manager.check_open('2020-10-08'))
+        self.assertEqual(False, calendar_manager.check_open('2021-01-01'))
+        # not work for weekend
+        self.assertEqual(True, calendar_manager.check_open('2021-01-02'))
+        self.assertEqual(True, calendar_manager.check_open('2021-01-04'))
 
 
 if __name__ == '__main__':

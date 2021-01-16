@@ -149,7 +149,10 @@ def get_last_trade_dates(delta: int = 400):
     # about 13 months ago
     start_time = end_time + datetime.timedelta(days = -delta)
     dates = pd.date_range(start = start_time, end = end_time, freq = 'B')
-    return dates.strftime(DATE_FORMAT)
+    dates = dates.strftime(DATE_FORMAT)
+    from .data_manager import calendar_manager
+    fdates = dates[dates.map(calendar_manager.check_open)]
+    return fdates
 
 
 #----------------------------------------------------------------------
@@ -354,7 +357,7 @@ def mk_notification(df: pd.DataFrame):
     df.index.rename('name', inplace = True)
     df.drop([HV_250_NAME], axis = 1, inplace = True)
     df2 = df.applymap(lambda x: f"{x:.1%}".strip('%') if isinstance(x, float) else x)
-    df2[HV_PER] = df[HV_PER]
+    df2[HV_PER] = df[HV_PER].apply(lambda x: f"{int(x)}" if isinstance(x, float) else x)
     content = f'{notify_format(df2)}'
     return notify_format_content(content)
 

@@ -24,7 +24,9 @@ class TestUtilities(ut.TestCase):
 
     def testCheckDateIn(self):
         """"""
-        dates = get_last_trade_dates(30)
+        dates = get_last_trade_dates()
+        # 2020-10-08 休市
+        self.assertEqual(False, check_date_in('2020-10-08', dates))
         self.assertEqual(True, check_date_in('2021-01-08', dates))
         self.assertEqual(False, check_date_in('2021-01-10', dates))
 
