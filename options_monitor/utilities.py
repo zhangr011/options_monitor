@@ -78,7 +78,7 @@ FUTURE_HV_NAMES = {
     'ss_f' : u'ss',
     'sc_f' : u'原油',
     'fu_f' : u'燃油',
-    'lu_f' : u'LU'
+    'lu_f' : u'LU',
     'bu_f' : u'沥青',
     'ru_f' : u'橡胶',
     'nr_f' : u'20胶',
