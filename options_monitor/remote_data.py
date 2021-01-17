@@ -115,6 +115,15 @@ def normalize_history_data(df: pd.DataFrame, final_key: str = u'总计'):
 
 
 #----------------------------------------------------------------------
+def fix_close_data(df: pd.DataFrame):
+    """fix czce's close price of 0"""
+    df[CLOSE_PRICE_NAME] = np.where(df[CLOSE_PRICE_NAME] == 0,
+                                    df[SETTLE_PRICE_NAME],
+                                    df[CLOSE_PRICE_NAME])
+    return df
+
+
+#----------------------------------------------------------------------
 def calculate_index(df_in: pd.DataFrame, total_key: str = TOTAL_ROW_KEY):
     """calculate the index, weighted average close price by open interest"""
     # https://stackoverflow.com/questions/31521027/groupby-weighted-average-and-sum-in-pandas-dataframe
@@ -270,6 +279,14 @@ class IRemoteHttpData(metaclass = ABCMeta):
     #----------------------------------------------------------------------
     def do_data_handle(self, data, date_str: str):
         raise NotImplementedError
+
+    #----------------------------------------------------------------------
+    def fix_close_data(self):
+        """"""
+        li, df = self.get_last_index()
+        df = fix_close_data(df)
+        df = calculate_index(df)
+        df.to_csv(path_or_buf = self.get_local_path())
 
 
 #----------------------------------------------------------------------
@@ -495,6 +512,7 @@ class RemoteHttpCZCEData(IRemoteHttpData):
         df[PRODUCT_GROUP_NAME] = np.where(df[PRODUCT_GROUP_NAME] == TOTAL_ROW_KEY,
                                           df[PRODUCT_GROUP_NAME].shift(1), df[PRODUCT_GROUP_NAME])
         df = normalize_history_data(df, u'总计')
+        df = fix_close_data(df)
         df = calculate_index(df)
         return df
 
