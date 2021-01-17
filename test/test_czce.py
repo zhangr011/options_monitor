@@ -13,7 +13,6 @@ class TestCZCEDataManager(ut.TestCase):
         dates = get_last_trade_dates()
         mgr = CZCEDataManager(dates)
         mgr.download_raw_data()
-        mgr._remote_data.fix_close_data()
         _li, df = mgr._remote_data.get_last_index()
         self.assertEqual(False, (df[CLOSE_PRICE_NAME] == 0).any())
 

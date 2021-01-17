@@ -281,12 +281,12 @@ class IRemoteHttpData(metaclass = ABCMeta):
         raise NotImplementedError
 
     #----------------------------------------------------------------------
-    def fix_close_data(self):
-        """"""
-        li, df = self.get_last_index()
-        df = fix_close_data(df)
-        df = calculate_index(df)
-        df.to_csv(path_or_buf = self.get_local_path())
+    # def fix_close_data(self):
+    #     """"""
+    #     li, df = self.get_last_index()
+    #     df = fix_close_data(df)
+    #     df = calculate_index(df)
+    #     df.to_csv(path_or_buf = self.get_local_path())
 
 
 #----------------------------------------------------------------------
@@ -512,7 +512,6 @@ class RemoteHttpCZCEData(IRemoteHttpData):
         df[PRODUCT_GROUP_NAME] = np.where(df[PRODUCT_GROUP_NAME] == TOTAL_ROW_KEY,
                                           df[PRODUCT_GROUP_NAME].shift(1), df[PRODUCT_GROUP_NAME])
         df = normalize_history_data(df, u'总计')
-        df = fix_close_data(df)
         df = calculate_index(df)
         return df
 

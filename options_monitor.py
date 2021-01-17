@@ -58,7 +58,7 @@ class MonitorScheduleManager(ScheduleManager):
 
 
 if __name__ == '__main__':
-    mgr = MonitorScheduleManager(True)
+    mgr = MonitorScheduleManager(False)
     logger.info('options monitor started. ')
     while True:
         sleep(1)
