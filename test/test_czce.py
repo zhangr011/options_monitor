@@ -15,7 +15,7 @@ class TestCZCEDataManager(ut.TestCase):
         mgr.download_raw_data()
         mgr._remote_data.fix_close_data()
         _li, df = mgr._remote_data.get_last_index()
-        self.assertEqual(True, df[df[CLOSE_PRICE_NAME] == 0].empty)
+        self.assertEqual(False, (df[CLOSE_PRICE_NAME] == 0).any())
 
 
 if __name__ == '__main__':
