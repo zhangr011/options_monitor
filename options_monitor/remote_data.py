@@ -6,7 +6,8 @@ from .utilities import PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, \
     OPEN_PRICE_NAME, HIGH_PRICE_NAME, LOW_PRICE_NAME, CLOSE_PRICE_NAME, \
     PRE_SETTLE_PRICE_NAME, SETTLE_PRICE_NAME, OPEN_INTEREST_NAME, OI_CHG_NAME, \
     VOLUME_NAME, TOTAL_ROW_KEY, COLUMN_NAMES
-
+from .utilities import IV_NAME, U_PRODUCT_ID_NAME, S_PRICE_NAME, \
+    U_PRICE_NAME, OPTION_TYPE_NAME, O_COLUMN_NAMES
 from .xml_to_pandas_dataframe import xml_to_pandas_dataframe
 from .soup_to_pandas_dataframe import soup_to_pandas_dataframe
 from .logger import logger
@@ -44,6 +45,11 @@ FIX_FILE_PATTERN = re.compile(r'\^|\=')
 
 
 GB_ENCODING = 'gb18030'
+
+
+# for siv
+STRIKE_BIAS_NAME = 'sbias'
+OPTION_BIAS_AA = 0.25
 
 
 #----------------------------------------------------------------------
@@ -115,6 +121,27 @@ def normalize_history_data(df: pd.DataFrame, final_key: str = u'总计'):
 
 
 #----------------------------------------------------------------------
+def normalize_options_data(df: pd.DataFrame, final_key: str = u'总计'):
+    """"""
+    # drop unexpected columns
+    df = df[O_COLUMN_NAMES]
+    # clear the final rows
+    df = df[(df[PRODUCT_ID_NAME] != final_key) & (df[PRODUCT_GROUP_NAME] != final_key)]
+    df.replace('', '0', regex = True, inplace = True)
+    # clear empty volume
+    df = df[df[VOLUME_NAME].notnull()]
+    df = to_numeric(df, VOLUME_NAME, int)
+    df = df[df[VOLUME_NAME] > 0]
+    df = to_numeric(df, OPEN_INTEREST_NAME, int)
+    # normalize price
+    df = to_numeric(df, S_PRICE_NAME, float)
+    df = to_numeric(df, U_PRICE_NAME, float)
+    df = to_numeric(df, IV_NAME, float)
+    df = to_numeric(df, CLOSE_PRICE_NAME, float)
+    return df
+
+
+#----------------------------------------------------------------------
 def fix_close_data(df: pd.DataFrame):
     """fix czce's close price of 0"""
     df[CLOSE_PRICE_NAME] = np.where(df[CLOSE_PRICE_NAME] == 0,
@@ -138,17 +165,38 @@ def calculate_index(df_in: pd.DataFrame, total_key: str = TOTAL_ROW_KEY):
 
 
 #----------------------------------------------------------------------
+def calculate_siv(df_in: pd.DataFrame, total_key: str = TOTAL_ROW_KEY):
+    """"""
+    df = df_in[df_in[PRODUCT_ID_NAME] != TOTAL_ROW_KEY]
+    df[STRIKE_BIAS_NAME] = abs(df[S_PRICE_NAME] - df[U_PRICE_NAME]) / df[U_PRICE_NAME]
+    df[STRIKE_BIAS_NAME] = np.where(df[STRIKE_BIAS_NAME] > OPTION_BIAS_AA,
+                                    0,
+                                    np.square((df[STRIKE_BIAS_NAME] - OPTION_BIAS_AA) / OPTION_BIAS_AA))
+    totals = df[[PRODUCT_GROUP_NAME, VOLUME_NAME]].groupby(PRODUCT_GROUP_NAME).sum()
+    df = df.join(totals, how = 'left', on = PRODUCT_GROUP_NAME, rsuffix = '_all')
+    df['weights'] = df[STRIKE_BIAS_NAME] * df[VOLUME_NAME] / df[VOLUME_NAME + '_all']
+    wm = lambda x: np.average(x[IV_NAME], weights = x['weights'])
+    group = df.groupby(PRODUCT_GROUP_NAME).apply(wm)
+    df_in[IV_NAME] = np.where(df_in[PRODUCT_ID_NAME] == total_key,
+                              round(group[df_in[PRODUCT_GROUP_NAME]], 3),
+                              df_in[IV_NAME])
+    return df_in
+
+
+#----------------------------------------------------------------------
 class IRemoteHttpData(metaclass = ABCMeta):
 
     remote_path = ""
     csv_mode = CSV_WRITE_MODE.APPEND
     request_post = False
 
-    def __init__(self, data_path: str, local: str, dates: pd.Index):
+    def __init__(self, data_path: str, local: str, dates: pd.Index,
+                 df_extra: pd.DataFrame):
         """Constructor"""
         self.data_path = data_path
         self.local = self.fix_file_name(local)
         self.dates = dates
+        self.df_extra = df_extra
 
     #----------------------------------------------------------------------
     def fix_file_name(self, local: str):
@@ -270,6 +318,17 @@ class IRemoteHttpData(metaclass = ABCMeta):
         except Exception as e:
             logger.error(f"http requests failed. {url} {traceback.format_exc(limit = 0)}")
             return False
+
+    #----------------------------------------------------------------------
+    def get_underlying_close_price(self, df: pd.DataFrame, date_str: str):
+        """"""
+        if self.df_extra is None:
+            raise NotImplementedError('underlying dataframe is None')
+        day_df = self.df_extra[self.df_extra.index == date_str][[PRODUCT_ID_NAME, CLOSE_PRICE_NAME]]
+        day_df.set_index(PRODUCT_ID_NAME, inplace = True)
+        df = df.join(day_df, rsuffix = '_u', how = 'left', on = U_PRODUCT_ID_NAME)
+        df.rename({'Close_u': U_PRICE_NAME}, axis = 1, inplace = True)
+        return df
 
     #----------------------------------------------------------------------
     def get_remote_path(self, date_str: str):
@@ -517,6 +576,49 @@ class RemoteHttpCZCEData(IRemoteHttpData):
 
 
 #----------------------------------------------------------------------
+class RemoteHttpCZCEOptionsData(RemoteHttpCZCEData, IRemoteHttpData):
+
+    # http://www.czce.com.cn/cn/DFSStaticFiles/Option/2021/20210105/OptionDataDaily.htm
+    remote_path = "http://www.czce.com.cn/cn/DFSStaticFiles/Option/%s/%s/OptionDataDaily.htm"
+
+    #----------------------------------------------------------------------
+    def do_data_handle(self, data, date_str: str):
+        """"""
+        df = get_table_soup(data, GB_ENCODING)
+        df[INDEX_KEY] = date_str
+        df.set_index(INDEX_KEY, inplace = True)
+        df.rename({
+            u'品种代码': PRODUCT_ID_NAME,
+            u'昨结算': PRE_SETTLE_PRICE_NAME,
+            u'今开盘': OPEN_PRICE_NAME,
+            u'最高价': HIGH_PRICE_NAME,
+            u'最低价': LOW_PRICE_NAME,
+            u'今收盘': CLOSE_PRICE_NAME,
+            u'今结算': SETTLE_PRICE_NAME,
+            u'持仓量': OPEN_INTEREST_NAME,
+            # old name of open interest
+            u'空盘量'  : OPEN_INTEREST_NAME,
+            u'增减量': OI_CHG_NAME,
+            u'成交量(手)': VOLUME_NAME,
+            u'隐含波动率': IV_NAME}, axis = 1, inplace = True)
+        # replace the total row's key name
+        df = normalize_total_key(df, u'小计')
+        # get the group name by product id
+        df[[U_PRODUCT_ID_NAME, OPTION_TYPE_NAME, S_PRICE_NAME]] = df[PRODUCT_ID_NAME].str.extract('(\w+\d+)(C|P)(\d+)')
+        df[PRODUCT_GROUP_NAME] = df[U_PRODUCT_ID_NAME].str.replace('\d+', '', regex = True)
+        df[PRODUCT_GROUP_NAME] = np.where(df[PRODUCT_GROUP_NAME].isnull(),
+                                          df[PRODUCT_ID_NAME],
+                                          df[PRODUCT_GROUP_NAME])
+        df[PRODUCT_GROUP_NAME] = np.where(df[PRODUCT_GROUP_NAME] == TOTAL_ROW_KEY,
+                                          df[PRODUCT_GROUP_NAME].shift(1), df[PRODUCT_GROUP_NAME])
+        df = df[~df[PRODUCT_ID_NAME].str.contains(u'合计', regex = True)]
+        df2 = self.get_underlying_close_price(df, date_str)
+        df2 = normalize_options_data(df2)
+        df2 = calculate_siv(df2)
+        return df2
+
+
+#----------------------------------------------------------------------
 class RemoteDataFactory():
 
     data_path = ''
@@ -526,7 +628,7 @@ class RemoteDataFactory():
         self.data_path = data_path
 
     #----------------------------------------------------------------------
-    def create(self, local: str, via: SYNC_DATA_MODE, dates: pd.Index):
+    def create(self, local: str, via: SYNC_DATA_MODE, dates: pd.Index, df_extra: pd.DataFrame):
         """the creator of RemoteData"""
         data_class = None
         if SYNC_DATA_MODE.HTTP_DOWNLOAD_CSINDEX_000300 == via:
@@ -541,6 +643,8 @@ class RemoteDataFactory():
             data_class = RemoteHttpDCEData
         elif SYNC_DATA_MODE.HTTP_DOWNLOAD_CZCE == via:
             data_class = RemoteHttpCZCEData
+        elif SYNC_DATA_MODE.HTTP_DOWNLOAD_CZCE_OPTIONS == via:
+            data_class = RemoteHttpCZCEOptionsData
         if data_class != None:
-            return data_class(self.data_path, local, dates)
+            return data_class(self.data_path, local, dates, df_extra)
         raise NotImplementedError

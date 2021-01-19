@@ -42,6 +42,14 @@ OPEN_INTEREST_NAME = 'OI'
 OI_CHG_NAME = 'OIChange'
 VOLUME_NAME = 'Volume'
 
+# for options
+IV_NAME = 'iv'
+U_PRODUCT_ID_NAME = 'u_id' # 标的物
+OPTION_TYPE_NAME = 'otype' # 期权类型 c call p put
+S_PRICE_NAME = 's_price'   # 行权价
+U_PRICE_NAME = 'u_price'   # 标的价
+
+
 # hv key
 HV_20_NAME = 'hvm'
 HV_250_NAME = 'hvy'
@@ -54,6 +62,9 @@ TOTAL_ROW_KEY = 'total'
 COLUMN_NAMES = [PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, PRE_SETTLE_PRICE_NAME,
                 OPEN_PRICE_NAME, HIGH_PRICE_NAME, LOW_PRICE_NAME, CLOSE_PRICE_NAME, SETTLE_PRICE_NAME,
                 OPEN_INTEREST_NAME, OI_CHG_NAME, VOLUME_NAME]
+
+O_COLUMN_NAMES = [PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, OPTION_TYPE_NAME, S_PRICE_NAME,
+                  U_PRICE_NAME, CLOSE_PRICE_NAME, IV_NAME, VOLUME_NAME, OPEN_INTEREST_NAME]
 
 # markdown head and \n replace
 MD_HEAD_PATTERN = re.compile(r'\|(:?-{3,}:?\|){4,}\n')
@@ -140,7 +151,7 @@ def get_day_index(last_day: datetime, hour: int):
 
 
 #----------------------------------------------------------------------
-def get_last_trade_dates(delta: int = 400):
+def get_last_trade_dates(delta: int = 500):
     delta = int(delta)
     end_time = datetime.datetime.now(sse_calendar.tz)
     utc_end_time = end_time.astimezone(datetime.timezone.utc)

@@ -21,10 +21,11 @@ class DataManager():
     data_path = DATA_ROOT
     local = ''
 
-    def __init__(self, trade_dates: pd.Index = None):
+    def __init__(self, trade_dates: pd.Index = None, df_extra: pd.DataFrame = None):
         """Constructor"""
         self._trade_dates = trade_dates
         self._remote_data = None
+        self._df_extra = df_extra
 
     #----------------------------------------------------------------------
     def download_raw_data(self, downloaded = False):
@@ -34,7 +35,7 @@ class DataManager():
         make_sure_dirs_exist(self.data_path)
         logger.info(f'start downloading data from {self.data_mode}')
         data_fac = RemoteDataFactory(self.data_path)
-        self._remote_data = data_fac.create(self.local, self.data_mode, self._trade_dates)
+        self._remote_data = data_fac.create(self.local, self.data_mode, self._trade_dates, self._df_extra)
         self._remote_data.sync_data()
         logger.info('all data downloaded. ')
 
@@ -147,3 +148,10 @@ class CZCEDataManager(DataManager):
 
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_CZCE
     local = 'czce'
+
+
+#----------------------------------------------------------------------
+class CZCEOptionsDataManager(DataManager):
+
+    data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_CZCE_OPTIONS
+    local = 'czce_options'
