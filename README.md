@@ -42,6 +42,7 @@ tail ./nohup.out
 | **上期所** | |
 | Request URL | http://www.shfe.com.cn/data/dailydata/kx/kx20210105.dat |
 | Request URL | http://www.shfe.com.cn/data/dailydata/option/kx/kx20210105.dat |
+| Request URL | http://www.shfe.com.cn/data/instrument/option/ContractBaseInfo20210105.dat |
 | 返回 | json 格式 |
 | **大商所** | |
 | Request URL | http://www.dce.com.cn/publicweb/quotesdata/dayQuotesCh.html |
