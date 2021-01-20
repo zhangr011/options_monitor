@@ -58,15 +58,18 @@ class TestOptionPrice(ut.TestCase):
         years = 365
         ir = 0.0435
         gid = 'ZC'
-        ivc = calc_iv(gid, 6.4, 770.8, 810, 15, PriceOptionType.CALL)
+        close = 770.8
+        ivc = calc_iv(gid, 6.4, close, 810, 15, PriceOptionType.CALL)
         # 2021-01-19,ZC103P810,ZC,P,810.0,770.8,55.0,41.22,261,134
-        ivp = calc_iv(gid, 55, 770.8, 810, 15, PriceOptionType.PUT)
+        ivp = calc_iv(gid, 55, close, 810, 15, PriceOptionType.PUT)
         total = 1763 + 261
-        # self.assertEqual(41.22, (ivc + ivp) / 2 * 100)
+        print(ivc, ivp)
+        self.assertEqual(41.22, (ivc + ivp) / 2 * 100)
         # 2021-01-19,ZC109C650,ZC,C,650.0,639.6,59.5,28.65,1,1
         ivc = calc_iv(gid, 59.5, 639.6, 650, 197, PriceOptionType.CALL)
         # 2021-01-19,ZC109P650,ZC,P,650.0,639.6,48.5,28.65,11,7
         ivp = calc_iv(gid, 48.5, 639.6, 650, 197, PriceOptionType.PUT)
+        print(ivc, ivp)
         self.assertEqual(28.65, (ivc + ivp) / 2 * 100)
 
 
