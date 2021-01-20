@@ -36,7 +36,7 @@ tail ./nohup.out
 | 参数 | earnings_performance 设置 3年/3个月 |
 | 返回 | json 格式 |
 | **中金所** | |
-| Request URL | http://www.cffex.com.cn/sj/hqsj/rtj/202101/05/index.xml?id=0 |
+| Request URL | http://www.cffex.com.cn/sj/hqsj/rtj/202101/05/index.xml?id=0<br />沪深 300 合约到期月份的第三个星期五，遇国家法定假日顺延 |
 | 参数 | id 设置一个随机访问 id |
 | 返回 | xml 格式 |
 | **上期所** | |
