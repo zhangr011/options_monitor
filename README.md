@@ -42,10 +42,11 @@ tail ./nohup.out
 | **上期所** | |
 | Request URL | http://www.shfe.com.cn/data/dailydata/kx/kx20210105.dat |
 | Request URL | http://www.shfe.com.cn/data/dailydata/option/kx/kx20210105.dat |
-| Request URL | http://www.shfe.com.cn/data/instrument/option/ContractBaseInfo20210105.dat |
+| Request URL | http://www.shfe.com.cn/data/instrument/option/ContractBaseInfo20210105.dat<br />按月获取，每个月的第一个交易日 |
 | 返回 | json 格式 |
 | **大商所** | |
 | Request URL | http://www.dce.com.cn/publicweb/quotesdata/dayQuotesCh.html |
+| Request URL | 豆粕 http://www.dce.com.cn/dalianshangpin/sspz/dpqq/index.html <br />玉米 http://www.dce.com.cn/dalianshangpin/sspz/ymqq/index.html <br />铁矿石 http://www.dce.com.cn/dalianshangpin/sspz/tksqq21/index.html <br />LPG http://www.dce.com.cn/dalianshangpin/sspz/yhsyqqq/index.html <br />塑料 http://www.dce.com.cn/dalianshangpin/sspz/6226615/index.html <br />pvc http://www.dce.com.cn/dalianshangpin/sspz/6226619/index.html <br />pp http://www.dce.com.cn/dalianshangpin/sspz/6226623/index.html |
 | Request Method | POST |
 | Params | dayQuotes.variety：all<br />dayQuotes.trade_type: 0 （0 - 期货 1 - 期权）<br />year: 2021<br />month: 0 （不是从 1 开始）<br />day: 05 （前面补0） |
 | 返回 | 网页，需要对网页解析 |
