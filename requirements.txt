@@ -1,4 +1,5 @@
 pandas>=1.1.2
-pandas-market-calendars
+# pandas-market-calendars
+trading_calendars
 threadpool
 crontab

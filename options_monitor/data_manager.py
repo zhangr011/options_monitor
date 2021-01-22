@@ -1,15 +1,17 @@
 # encoding: UTF-8
 
-from .utilities import \
-    make_sure_dirs_exist, DATA_ROOT, DATE_FORMAT, sse_calendar, \
+from .data_ref import \
+    DATA_ROOT, DATE_FORMAT, sse_calendar, \
     PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, CLOSE_PRICE_NAME, TOTAL_ROW_KEY, \
     HV_20_NAME, HV_250_NAME, HV_20_250_NAME, HV_PER
 from .utilities_hv import \
     HV_DISTRIBUTION_PERIODS, historical_volatility, calc_percentage
+from .utilities import make_sure_dirs_exist
 from .remote_data import RemoteDataFactory, SYNC_DATA_MODE
 from .logger import logger
 from functools import cached_property
 
+import trading_calendars as tcs
 import os, datetime
 import pandas as pd
 
@@ -21,11 +23,18 @@ class DataManager():
     data_path = DATA_ROOT
     local = ''
 
+    #----------------------------------------------------------------------
     def __init__(self, trade_dates: pd.Index = None, df_extra: pd.DataFrame = None):
         """Constructor"""
         self._trade_dates = trade_dates
         self._remote_data = None
         self._df_extra = df_extra
+        self.post_initialized()
+
+    #----------------------------------------------------------------------
+    def post_initialized(self):
+        """do some hook when initialized"""
+        pass
 
     #----------------------------------------------------------------------
     def download_raw_data(self, downloaded = False):
@@ -88,6 +97,12 @@ class CFFECalendarDataManager(DataManager):
     local = 'cffe_calendar'
 
     #----------------------------------------------------------------------
+    def post_initialized(self):
+        """"""
+        self._trading_calendars = tcs.get_calendar('XSHG')
+        self._trading_sessions = self._trading_calendars.all_sessions
+
+    #----------------------------------------------------------------------
     def analyze(self):
         pass
 
@@ -107,8 +122,8 @@ class CFFECalendarDataManager(DataManager):
         return df
 
     #----------------------------------------------------------------------
-    def check_open(self, date_str: str):
-        """check if the market closed. """
+    def check_open2(self, date_str: str):
+        """check if the market is opened. """
         calendar = self.get_trading_calendar
         try:
             date_row = calendar.loc[date_str]
@@ -116,6 +131,11 @@ class CFFECalendarDataManager(DataManager):
         except KeyError:
             # not in the calendar, it's ok
             return True
+
+    #----------------------------------------------------------------------
+    def check_open(self, date_str: str):
+        """check if the market is opened. """
+        return date_str in self._trading_sessions
 
 
 #----------------------------------------------------------------------

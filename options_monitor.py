@@ -1,6 +1,8 @@
 # encoding: UTF-8
 
-from options_monitor.utilities import get_last_trade_dates, SCHEDULE_HOUR, mk_notification
+from options_monitor.utilities_calendar import get_last_trade_dates
+from options_monitor.data_ref import SCHEDULE_HOUR
+from options_monitor.utilities import mk_notification
 from options_monitor.utilities_hv import sort_hv20250
 from options_monitor.schedule_manager import ScheduleManager
 from options_monitor.util_dingding import send_md_msg
@@ -58,7 +60,7 @@ class MonitorScheduleManager(ScheduleManager):
 
 
 if __name__ == '__main__':
-    mgr = MonitorScheduleManager(False)
+    mgr = MonitorScheduleManager(True)
     logger.info('options monitor started. ')
     while True:
         sleep(1)

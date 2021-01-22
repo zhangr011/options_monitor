@@ -3,8 +3,8 @@
 import unittest as ut
 
 from datetime import datetime
-from options_monitor.utilities import \
-    get_last_trade_dates, check_date_in, sse_calendar, DATE_FORMAT
+from options_monitor.data_ref import sse_calendar, DATE_FORMAT, check_date_in
+from options_monitor.utilities_calendar import get_last_trade_dates
 
 
 #----------------------------------------------------------------------

@@ -1,13 +1,15 @@
 #encoding: UTF-8
 
-from .utilities import \
-    INDEX_KEY, DATE_FORMAT, check_date_in, load_futures_by_csv
-from .utilities import PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, \
+
+from .data_ref import SYNC_DATA_MODE
+from .data_ref import INDEX_KEY, DATE_FORMAT, check_date_in
+from .data_ref import PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, \
     OPEN_PRICE_NAME, HIGH_PRICE_NAME, LOW_PRICE_NAME, CLOSE_PRICE_NAME, \
     PRE_SETTLE_PRICE_NAME, SETTLE_PRICE_NAME, OPEN_INTEREST_NAME, OI_CHG_NAME, \
     VOLUME_NAME, TOTAL_ROW_KEY, COLUMN_NAMES
-from .utilities import IV_NAME, U_PRODUCT_ID_NAME, S_PRICE_NAME, \
+from .data_ref import IV_NAME, U_PRODUCT_ID_NAME, S_PRICE_NAME, \
     U_PRICE_NAME, OPTION_TYPE_NAME, O_COLUMN_NAMES
+from .utilities import load_futures_by_csv
 from .xml_to_pandas_dataframe import xml_to_pandas_dataframe
 from .soup_to_pandas_dataframe import soup_to_pandas_dataframe
 from .logger import logger
@@ -19,20 +21,6 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
-
-
-#----------------------------------------------------------------------
-class SYNC_DATA_MODE(Enum):
-    HTTP_DOWNLOAD_CFFE          = 11
-    # trading calendar
-    HTTP_DOWNLOAD_CFFE_CALENDAR = 15
-    HTTP_DOWNLOAD_SHFE          = 21
-    HTTP_DOWNLOAD_SHFE_OPTIONS  = 22
-    HTTP_DOWNLOAD_DCE           = 31
-    HTTP_DOWNLOAD_CZCE          = 41
-    HTTP_DOWNLOAD_CZCE_OPTIONS  = 42
-    # 沪深 300 指数
-    HTTP_DOWNLOAD_CSINDEX_000300 = 51
 
 
 #----------------------------------------------------------------------
@@ -50,6 +38,8 @@ GB_ENCODING = 'gb18030'
 # for siv
 STRIKE_BIAS_NAME = 'sbias'
 OPTION_BIAS_AA = 0.25
+
+OPTIONS_NAME_RE = '(\w+\d+)(C|P)(\d+)'
 
 
 #----------------------------------------------------------------------
@@ -604,7 +594,7 @@ class RemoteHttpCZCEOptionsData(RemoteHttpCZCEData, IRemoteHttpData):
         # replace the total row's key name
         df = normalize_total_key(df, u'小计')
         # get the group name by product id
-        df[[U_PRODUCT_ID_NAME, OPTION_TYPE_NAME, S_PRICE_NAME]] = df[PRODUCT_ID_NAME].str.extract('(\w+\d+)(C|P)(\d+)')
+        df[[U_PRODUCT_ID_NAME, OPTION_TYPE_NAME, S_PRICE_NAME]] = df[PRODUCT_ID_NAME].str.extract(OPTIONS_NAME_RE)
         df[PRODUCT_GROUP_NAME] = df[U_PRODUCT_ID_NAME].str.replace('\d+', '', regex = True)
         df[PRODUCT_GROUP_NAME] = np.where(df[PRODUCT_GROUP_NAME].isnull(),
                                           df[PRODUCT_ID_NAME],
@@ -616,6 +606,17 @@ class RemoteHttpCZCEOptionsData(RemoteHttpCZCEData, IRemoteHttpData):
         df2 = normalize_options_data(df2)
         df2 = calculate_siv(df2)
         return df2
+
+
+#----------------------------------------------------------------------
+class RemoteHttpExpiryDate(IRemoteHttpData):
+
+    # http://www.shfe.com.cn/data/instrument/option/ContractBaseInfo20210105.dat
+    remote_path = {'DCE': "http://www.shfe.com.cn/data/instrument/option/ContractBaseInfo%s.dat",
+                   'm': "http://www.dce.com.cn/dalianshangpin/sspz/dpqq/index.html",
+                   'c': "http://www.dce.com.cn/dalianshangpin/sspz/ymqq/index.html",
+                   'i': "http://www.dce.com.cn/dalianshangpin/sspz/tksqq21/index.html",
+                   'LPG': "http://www.dce.com.cn/dalianshangpin/sspz/yhsyqqq/index.html"}
 
 
 #----------------------------------------------------------------------

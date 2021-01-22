@@ -1,6 +1,6 @@
 # encoding: UTF-8
 
-from .utilities import PRODUCT_GROUP_NAME, CLOSE_PRICE_NAME, \
+from .data_ref import PRODUCT_GROUP_NAME, CLOSE_PRICE_NAME, \
     HV_20_NAME, HV_250_NAME, HV_20_250_NAME, HV_PER
 import pandas as pd
 import numpy as np

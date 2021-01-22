@@ -1,7 +1,8 @@
 # encoding: UTF-8
 
 import unittest as ut
-from options_monitor.utilities import get_last_trade_dates, CLOSE_PRICE_NAME
+from options_monitor.data_ref import CLOSE_PRICE_NAME
+from options_monitor.utilities_calendar import get_last_trade_dates
 from options_monitor.data_manager import CZCEDataManager, CZCEOptionsDataManager
 import pandas as pd
 pd.set_option('mode.chained_assignment', None)

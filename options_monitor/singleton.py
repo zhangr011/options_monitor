@@ -5,10 +5,10 @@ class Singleton(type):
     how to use:
     - python2
     class MyClass(object):
-        __metaclass__ = AzSingleton
+        __metaclass__ = Singleton
 
     - python3
-    class MyClass(metaclass = AzSingleton):
+    class MyClass(metaclass = Singleton):
         pass
     """
     _instances = {}
