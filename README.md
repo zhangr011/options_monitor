@@ -42,16 +42,16 @@ tail ./nohup.out
 | **上期所** | |
 | Request URL | http://www.shfe.com.cn/data/dailydata/kx/kx20210105.dat |
 | Request URL | http://www.shfe.com.cn/data/dailydata/option/kx/kx20210105.dat |
-| Request URL | http://www.shfe.com.cn/data/instrument/option/ContractBaseInfo20210105.dat<br />按月获取，每个月的第一个交易日 |
+| Request URL | http://www.shfe.com.cn/data/instrument/option/ContractBaseInfo20210105.dat<br />标的期货合约到期月份前一个月的倒数第 5 个交易日 |
 | 返回 | json 格式 |
 | **大商所** | |
 | Request URL | http://www.dce.com.cn/publicweb/quotesdata/dayQuotesCh.html<br />POST<br />dayQuotes.variety：all<br />dayQuotes.trade_type: 0 （0 - 期货 1 - 期权）<br />year: 2021<br />month: 0 （不是从 1 开始）<br />day: 05 （前面补0） |
-| Request URL | 豆粕 http://www.dce.com.cn/dalianshangpin/sspz/dpqq/index.html <br />玉米 http://www.dce.com.cn/dalianshangpin/sspz/ymqq/index.html <br />铁矿石 http://www.dce.com.cn/dalianshangpin/sspz/tksqq21/index.html <br />LPG http://www.dce.com.cn/dalianshangpin/sspz/yhsyqqq/index.html <br />塑料 http://www.dce.com.cn/dalianshangpin/sspz/6226615/index.html <br />pvc http://www.dce.com.cn/dalianshangpin/sspz/6226619/index.html <br />pp http://www.dce.com.cn/dalianshangpin/sspz/6226623/index.html |
+| Request URL | 豆粕 http://www.dce.com.cn/dalianshangpin/sspz/dpqq/index.html <br />玉米 http://www.dce.com.cn/dalianshangpin/sspz/ymqq/index.html <br />铁矿石 http://www.dce.com.cn/dalianshangpin/sspz/tksqq21/index.html <br />LPG http://www.dce.com.cn/dalianshangpin/sspz/yhsyqqq/index.html <br />塑料 http://www.dce.com.cn/dalianshangpin/sspz/6226615/index.html <br />pvc http://www.dce.com.cn/dalianshangpin/sspz/6226619/index.html <br />pp http://www.dce.com.cn/dalianshangpin/sspz/6226623/index.html <br />标的期货合约到期月份前一个月第 5 个交易日 |
 | 返回 | 网页，需要对网页解析 |
 | **郑商所** | |
 | Request URL | http://www.czce.com.cn/cn/DFSStaticFiles/Future/2021/20210105/FutureDataDaily.htm
 | Request URL | http://www.czce.com.cn/cn/DFSStaticFiles/Option/2021/20210105/OptionDataDaily.htm
-| Request URL | http://app.czce.com.cn/cms/pub/search/searchjyyl.jsp<br /> POST<br />tradetype: option<br />DtbeginDate: 2011-01-01<br />DtendDate: 2021-01-20<br />__go2pageNum: 1 |
+| Request URL | http://app.czce.com.cn/cms/pub/search/searchjyyl.jsp<br /> POST<br />tradetype: option<br />DtbeginDate: 2011-01-01<br />DtendDate: 2021-01-20<br />__go2pageNum: 1 <br />标的期货合约到期月份前一个月第 3 个交易日 |
 | 返回 | 网页，需要对网页进行解析 |
 
 ## 计算方法
