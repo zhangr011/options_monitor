@@ -343,6 +343,11 @@ class IRemoteHttpData(metaclass = ABCMeta):
         return data
 
     #----------------------------------------------------------------------
+    def save_data_test(self, df: pd.DataFrame):
+        """save the data, for test only"""
+        df.to_csv(path_or_buf = self.get_local_path())
+
+    #----------------------------------------------------------------------
     def do_query_remote(self, date_str: str):
         """query the remote data"""
         try:
