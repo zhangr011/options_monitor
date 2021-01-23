@@ -674,6 +674,19 @@ class RemoteHttpDCEData(IRemoteHttpData):
 
 
 #----------------------------------------------------------------------
+class RemoteHttpDCEOptionsData(RemoteHttpDCEData):
+
+    #
+    remote_path = ''
+    request_post = True
+
+    #----------------------------------------------------------------------
+    def do_data_handle(self, data, date_str: str):
+        """"""
+        pass
+
+
+#----------------------------------------------------------------------
 class RemoteHttpCZCEData(IRemoteHttpData):
 
     # http://www.czce.com.cn/cn/DFSStaticFiles/Future/2021/20210105/FutureDataDaily.htm

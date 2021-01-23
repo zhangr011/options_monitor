@@ -34,7 +34,7 @@ def get_next_trading_day_str(time: pd.Timestamp, shift_days: int = 1):
     shift_delta = shift_days // shift_times
     while True:
         day_str = time.strftime(DATE_FORMAT)
-        if calendar_manager.check_open(day_str):
+        if calendar_manager.check_open(day_str, False):
             idx += 1
         if idx >= shift_times:
             return day_str

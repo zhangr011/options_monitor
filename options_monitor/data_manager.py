@@ -132,10 +132,10 @@ class CFFECalendarDataManager(DataManager):
             return True
 
     #----------------------------------------------------------------------
-    def check_open(self, date_str: str):
+    def check_open(self, date_str: str, check_detail: bool = True):
         """check if the market is opened. """
         checked = date_str in self._trading_sessions
-        if checked is True:
+        if checked is True and check_detail is True:
             return self.check_open2(date_str)
         return checked
 
