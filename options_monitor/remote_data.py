@@ -578,10 +578,53 @@ class RemoteHttpSHFEData(IRemoteHttpData):
             'VOLUME'      : VOLUME_NAME}, inplace = True)
         # replace the total row's key name
         df = normalize_total_key(df, u'小计')
+        # fix the product id
+        df[PRODUCT_ID_NAME] = np.where(
+            df[PRODUCT_ID_NAME] == TOTAL_ROW_KEY,
+            df[PRODUCT_ID_NAME],
+            df[PRODUCT_GROUP_NAME].str.strip().str.replace('_f', '') + df[PRODUCT_ID_NAME])
         df = normalize_history_data(df, u'总计')
         df = calculate_index(df)
         return df
 
+
+#----------------------------------------------------------------------
+class RemoteHttpSHFEOptionsData(RemoteHttpSHFEData):
+
+    # http://www.shfe.com.cn/data/dailydata/option/kx/kx20210105.dat
+    remote_path = 'http://www.shfe.com.cn/data/dailydata/option/kx/kx%s.dat'
+
+    #----------------------------------------------------------------------
+    def do_data_handle(self, data, date_str: str):
+        """"""
+        data_list = get_content_json(data)
+        data_list = data_list.get('o_curinstrument')
+        df = pd.json_normalize(data_list)
+        df[INDEX_KEY] = date_str
+        df.set_index(INDEX_KEY, inplace = True)
+        df.rename({
+            'INSTRUMENTID' : PRODUCT_ID_NAME,
+            'PRODUCTGROUPID' : PRODUCT_GROUP_NAME,
+            'PRESETTLEMENTPRICE' : PRE_SETTLE_PRICE_NAME,
+            'OPENPRICE'    : OPEN_PRICE_NAME,
+            'HIGHESTPRICE' : HIGH_PRICE_NAME,
+            'CLOSEPRICE'   : CLOSE_PRICE_NAME,
+            'SETTLEMENTPRICE' : SETTLE_PRICE_NAME,
+            'OPENINTEREST' : OPEN_INTEREST_NAME,
+            'OPENINTERESTCHG' : OI_CHG_NAME,
+            'VOLUME' : VOLUME_NAME}, axis = 1, inplace = True)
+        # replace the total row's key name
+        df = normalize_total_key(df, u'小计')
+        df = parse_options_name(df)
+        # drop the final statistics row
+        df = df[~df[PRODUCT_ID_NAME].str.contains(u'合计', regex = True)]
+        df2 = self.get_underlying_close_price(df, date_str)
+        df2 = normalize_options_data(df2)
+        import pdb
+        pdb.set_trace()
+        df2 = calculate_iv(df2)
+        df2 = calculate_siv(df2)
+        return df2
 
 #----------------------------------------------------------------------
 class RemoteHttpDCEData(IRemoteHttpData):
@@ -674,7 +717,7 @@ class RemoteHttpCZCEData(IRemoteHttpData):
 
 
 #----------------------------------------------------------------------
-class RemoteHttpCZCEOptionsData(RemoteHttpCZCEData, IRemoteHttpData):
+class RemoteHttpCZCEOptionsData(RemoteHttpCZCEData):
 
     # http://www.czce.com.cn/cn/DFSStaticFiles/Option/2021/20210105/OptionDataDaily.htm
     remote_path = "http://www.czce.com.cn/cn/DFSStaticFiles/Option/%s/%s/OptionDataDaily.htm"
@@ -701,8 +744,8 @@ class RemoteHttpCZCEOptionsData(RemoteHttpCZCEData, IRemoteHttpData):
             u'隐含波动率': IV_NAME}, axis = 1, inplace = True)
         # replace the total row's key name
         df = normalize_total_key(df, u'小计')
-        # get the group name by product id
         df = parse_options_name(df)
+        # get the group name by product id
         df[PRODUCT_GROUP_NAME] = df[U_PRODUCT_ID_NAME].str.replace('\d+', '', regex = True)
         df[PRODUCT_GROUP_NAME] = np.where(df[PRODUCT_GROUP_NAME].isnull(),
                                           df[PRODUCT_ID_NAME],
@@ -752,6 +795,8 @@ class RemoteDataFactory(metaclass = Singleton):
             data_class = RemoteHttpCFFEOptionsData
         elif SYNC_DATA_MODE.HTTP_DOWNLOAD_SHFE == via:
             data_class = RemoteHttpSHFEData
+        elif SYNC_DATA_MODE.HTTP_DOWNLOAD_SHFE_OPTIONS == via:
+            data_class = RemoteHttpSHFEOptionsData
         elif SYNC_DATA_MODE.HTTP_DOWNLOAD_DCE == via:
             data_class = RemoteHttpDCEData
         elif SYNC_DATA_MODE.HTTP_DOWNLOAD_CZCE == via:

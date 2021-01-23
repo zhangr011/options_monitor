@@ -166,6 +166,13 @@ class SHFEDataManager(DataManager):
 
 
 #----------------------------------------------------------------------
+class SHFEOptionsDataManager(DataManager):
+
+    data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_SHFE_OPTIONS
+    local = 'shfe_options'
+
+
+#----------------------------------------------------------------------
 class DCEDataManager(DataManager):
 
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_DCE

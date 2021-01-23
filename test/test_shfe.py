@@ -1,8 +1,8 @@
 # encoding: UTF-8
 
 import unittest as ut
-from options_monitor.data_manager import SHFEDataManager
-from options_monitor.utilities import get_last_trade_dates
+from options_monitor.data_manager import SHFEDataManager, SHFEOptionsDataManager
+from options_monitor.utilities_calendar import get_last_trade_dates
 
 
 #----------------------------------------------------------------------
@@ -13,9 +13,11 @@ class TestSHFEDataManager(ut.TestCase):
         dates = get_last_trade_dates()
         mgr = SHFEDataManager(dates)
         mgr.download_raw_data()
-        dfs = mgr.analyze()
+        # dfs = mgr.analyze()
         # mgr._remote_data.drop_local_last_date_data()
-        pass
+        _li, df_extra = mgr._remote_data.get_last_index()
+        mgr2 = SHFEOptionsDataManager(dates, df_extra)
+        mgr2.download_raw_data()
 
 
 if __name__ == '__main__':
