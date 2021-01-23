@@ -31,17 +31,6 @@ def get_day_index(last_day: datetime, hour: int):
 
 
 #----------------------------------------------------------------------
-def make_sure_dirs_exist(path):
-    """确保目录存在"""
-    is_exist = os.path.exists(path)
-    if not is_exist:
-        os.makedirs(path)
-    if not os.path.exists(path):
-        return False
-    return True
-
-
-#----------------------------------------------------------------------
 def get_file_path(filename: str) -> str:
     return os.path.join(DATA_ROOT, filename)
 

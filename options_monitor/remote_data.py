@@ -1,17 +1,19 @@
 #encoding: UTF-8
 
 
-from .data_ref import SYNC_DATA_MODE
-from .data_ref import INDEX_KEY, DATE_FORMAT, check_date_in
+from .data_ref import SYNC_DATA_MODE, DATA_ROOT, make_sure_dirs_exist
+from .data_ref import INDEX_KEY, DATE_FORMAT
 from .data_ref import PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, \
     OPEN_PRICE_NAME, HIGH_PRICE_NAME, LOW_PRICE_NAME, CLOSE_PRICE_NAME, \
     PRE_SETTLE_PRICE_NAME, SETTLE_PRICE_NAME, OPEN_INTEREST_NAME, OI_CHG_NAME, \
     VOLUME_NAME, TOTAL_ROW_KEY, COLUMN_NAMES
 from .data_ref import IV_NAME, U_PRODUCT_ID_NAME, S_PRICE_NAME, \
-    U_PRICE_NAME, OPTION_TYPE_NAME, O_COLUMN_NAMES
+    U_PRICE_NAME, OPTION_TYPE_NAME, O_COLUMN_NAMES, EXPIRY_NAME
 from .utilities import load_futures_by_csv
+from .utilities_options import oc_mgr
 from .xml_to_pandas_dataframe import xml_to_pandas_dataframe
 from .soup_to_pandas_dataframe import soup_to_pandas_dataframe
+from .singleton import Singleton
 from .logger import logger
 
 from abc import abstractclassmethod, ABCMeta
@@ -40,6 +42,7 @@ STRIKE_BIAS_NAME = 'sbias'
 OPTION_BIAS_AA = 0.25
 
 OPTIONS_NAME_RE = '(\w+\d+)(C|P)(\d+)'
+OPTIONS_NAME_DASH_RE = '(\w+\d+)-(C|P)-(\d+)'
 
 
 #----------------------------------------------------------------------
@@ -86,6 +89,18 @@ def normalize_total_key(df: pd.DataFrame, key: str):
 
 
 #----------------------------------------------------------------------
+def fill_total_keys(df: pd.DataFrame):
+    """"""
+    keys = df.groupby([df.index, PRODUCT_GROUP_NAME]).groups.keys()
+    rows = []
+    for date, key in keys:
+        row = df[(df.index == date) & (df[PRODUCT_GROUP_NAME] == key)].iloc[0]
+        row[PRODUCT_ID_NAME] = TOTAL_ROW_KEY
+        rows.append(row)
+    return df.append(rows)
+
+
+#----------------------------------------------------------------------
 def normalize_history_data(df: pd.DataFrame, final_key: str = u'总计'):
     """"""
     # drop unexpected columns
@@ -126,7 +141,7 @@ def normalize_options_data(df: pd.DataFrame, final_key: str = u'总计'):
     # normalize price
     df = to_numeric(df, S_PRICE_NAME, float)
     df = to_numeric(df, U_PRICE_NAME, float)
-    df = to_numeric(df, IV_NAME, float)
+    # df = to_numeric(df, IV_NAME, float)
     df = to_numeric(df, CLOSE_PRICE_NAME, float)
     return df
 
@@ -147,11 +162,35 @@ def calculate_index(df_in: pd.DataFrame, total_key: str = TOTAL_ROW_KEY):
     # https://stackoverflow.com/questions/26205922/calculate-weighted-average-using-a-pandas-dataframe
     df = df_in[df_in[PRODUCT_ID_NAME] != TOTAL_ROW_KEY]
     wm = lambda x: np.average(x[CLOSE_PRICE_NAME], weights = x[OPEN_INTEREST_NAME])
-    group = df.groupby(PRODUCT_GROUP_NAME).apply(wm)
-    df_in[CLOSE_PRICE_NAME] = np.where(df_in[PRODUCT_ID_NAME] == total_key,
-                                       round(group[df_in[PRODUCT_GROUP_NAME]], 3),
-                                       df_in[CLOSE_PRICE_NAME])
+    group = df.groupby([df.index, PRODUCT_GROUP_NAME]).apply(wm)
+    df_in[CLOSE_PRICE_NAME] = np.where(
+        df_in[PRODUCT_ID_NAME] == total_key,
+        round(group[pd.MultiIndex.from_arrays([df_in.index, df_in[PRODUCT_GROUP_NAME]])], 3),
+        df_in[CLOSE_PRICE_NAME])
     return df_in
+
+
+#----------------------------------------------------------------------
+def parse_options_name(df: pd.DataFrame, pattern: str = OPTIONS_NAME_RE):
+    df[[U_PRODUCT_ID_NAME, OPTION_TYPE_NAME, S_PRICE_NAME]] = df[PRODUCT_ID_NAME].str.extract(pattern)
+    return df
+
+
+#----------------------------------------------------------------------
+def calc_iv_helper(row, total_key: str):
+    if row[PRODUCT_ID_NAME] == total_key:
+        # for total key, pass the old iv directly
+        return 0.
+    else:
+        iv = oc_mgr.calc_iv(row[PRODUCT_ID_NAME], row[CLOSE_PRICE_NAME], row[U_PRICE_NAME], row.name)
+        return iv
+
+
+#----------------------------------------------------------------------
+def calculate_iv(df: pd.DataFrame, total_key: str = TOTAL_ROW_KEY):
+    """calculate single product's iv"""
+    df[IV_NAME] = df.apply(lambda row: calc_iv_helper(row, total_key), axis = 1)
+    return df
 
 
 #----------------------------------------------------------------------
@@ -162,14 +201,15 @@ def calculate_siv(df_in: pd.DataFrame, total_key: str = TOTAL_ROW_KEY):
     df[STRIKE_BIAS_NAME] = np.where(df[STRIKE_BIAS_NAME] > OPTION_BIAS_AA,
                                     0,
                                     np.square((df[STRIKE_BIAS_NAME] - OPTION_BIAS_AA) / OPTION_BIAS_AA))
-    totals = df[[PRODUCT_GROUP_NAME, VOLUME_NAME]].groupby(PRODUCT_GROUP_NAME).sum()
-    df = df.join(totals, how = 'left', on = PRODUCT_GROUP_NAME, rsuffix = '_all')
+    totals = df[[PRODUCT_GROUP_NAME, VOLUME_NAME]].groupby([df.index, PRODUCT_GROUP_NAME]).sum()
+    df = df.join(totals, how = 'left', on = [df.index, PRODUCT_GROUP_NAME], rsuffix = '_all')
     df['weights'] = df[STRIKE_BIAS_NAME] * df[VOLUME_NAME] / df[VOLUME_NAME + '_all']
     wm = lambda x: np.average(x[IV_NAME], weights = x['weights'])
-    group = df.groupby(PRODUCT_GROUP_NAME).apply(wm)
-    df_in[IV_NAME] = np.where(df_in[PRODUCT_ID_NAME] == total_key,
-                              round(group[df_in[PRODUCT_GROUP_NAME]], 3),
-                              df_in[IV_NAME])
+    group = df.groupby([df.index, PRODUCT_GROUP_NAME]).apply(wm)
+    df_in[IV_NAME] = np.where(
+        df_in[PRODUCT_ID_NAME] == total_key,
+        round(group[pd.MultiIndex.from_arrays([df_in.index, df_in[PRODUCT_GROUP_NAME]])], 3),
+        df_in[IV_NAME])
     return df_in
 
 
@@ -186,7 +226,12 @@ class IRemoteHttpData(metaclass = ABCMeta):
         self.data_path = data_path
         self.local = self.fix_file_name(local)
         self.dates = dates
-        self.df_extra = df_extra
+        self.df_extra = self.fix_df_extra(df_extra)
+
+    #----------------------------------------------------------------------
+    def fix_df_extra(self, df: pd.DataFrame):
+        """api for data processing. """
+        return df
 
     #----------------------------------------------------------------------
     def fix_file_name(self, local: str):
@@ -241,7 +286,7 @@ class IRemoteHttpData(metaclass = ABCMeta):
             # logger.error(f'{self.remote_path} download failed: {traceback.format_exc()}')
             logger.error(f'sync data failed: {traceback.format_exc(limit = 0)}')
         except:
-            logger.error(f'sync data failed: {traceback.format_exc()}')
+            logger.error(f'sync data failed {dates}: {traceback.format_exc()}')
 
     #----------------------------------------------------------------------
     def get_the_request_dates(self, local_date: str):
@@ -264,6 +309,8 @@ class IRemoteHttpData(metaclass = ABCMeta):
         """request one"""
         raw_data = self.do_query_remote(request_date)
         data = self.do_data_handle(raw_data, request_date)
+        if data is None:
+            return
         data.index.rename(INDEX_KEY, inplace = True)
         # print(data)
         # with index
@@ -431,8 +478,62 @@ class RemoteHttpCFFEData(IRemoteHttpData):
         # format the trade day
         index = df.index.str.slice_replace(6, stop = 6, repl = '-')
         df.index = index.str.slice_replace(4, stop = 4, repl = '-')
-        df.rename(columns = {'closeprice': CLOSE_PRICE_NAME}, inplace = True)
+        df.rename({
+            'instrumentid' : PRODUCT_ID_NAME,
+            'productid' : PRODUCT_GROUP_NAME,
+            'presettlementprice' : PRE_SETTLE_PRICE_NAME,
+            'openprice' : OPEN_PRICE_NAME,
+            'highestprice' : HIGH_PRICE_NAME,
+            'lowestprice' : LOW_PRICE_NAME,
+            'closeprice': CLOSE_PRICE_NAME,
+            'settlementprice' : SETTLE_PRICE_NAME,
+            'openinterest' : OPEN_INTEREST_NAME,
+            'volume' : VOLUME_NAME,
+            'expiredate' : EXPIRY_NAME}, axis = 1, inplace = True)
+        df[OI_CHG_NAME] = df[OPEN_INTEREST_NAME].astype(int) - df['preopeninterest'].astype(int)
+        df = self.do_data_handle_extra(df, date_str)
         return df
+
+    #----------------------------------------------------------------------
+    def do_data_handle_extra(self, df: pd.DataFrame, date_str: str):
+        """"""
+        # filter the options data
+        df = df[~df[PRODUCT_GROUP_NAME].isin(['IO'])]
+        df = fill_total_keys(df)
+        df = normalize_history_data(df)
+        df = calculate_index(df)
+        return df
+
+
+#----------------------------------------------------------------------
+class RemoteHttpCFFEOptionsData(RemoteHttpCFFEData):
+
+    # http://www.cffex.com.cn/sj/hqsj/rtj/202101/05/index.xml?id=0
+    remote_path = "http://www.cffex.com.cn/sj/hqsj/rtj/%s/%s/index.xml?id=%d"
+    id_request = 0
+
+    #----------------------------------------------------------------------
+    def fix_df_extra(self, df: pd.DataFrame):
+        """api for data processing. """
+        df[PRODUCT_ID_NAME] = df[PRODUCT_GROUP_NAME]
+        return df
+
+    #----------------------------------------------------------------------
+    def do_data_handle_extra(self, df: pd.DataFrame, date_str: str):
+        """"""
+        df = df[df[PRODUCT_GROUP_NAME].isin(['IO'])]
+        if df.empty:
+            # options data maybe empty
+            return None
+        df = fill_total_keys(df)
+        df = parse_options_name(df, OPTIONS_NAME_DASH_RE)
+        # set the IO options' underlying contract to csindex000300
+        df[U_PRODUCT_ID_NAME] = df[U_PRODUCT_ID_NAME].str.replace('IO\d+', 'csidx300', regex = True)
+        df2 = self.get_underlying_close_price(df, date_str)
+        df2 = normalize_options_data(df2)
+        df2 = calculate_iv(df2)
+        df2 = calculate_siv(df2)
+        return df2
 
 
 #----------------------------------------------------------------------
@@ -594,7 +695,7 @@ class RemoteHttpCZCEOptionsData(RemoteHttpCZCEData, IRemoteHttpData):
         # replace the total row's key name
         df = normalize_total_key(df, u'小计')
         # get the group name by product id
-        df[[U_PRODUCT_ID_NAME, OPTION_TYPE_NAME, S_PRICE_NAME]] = df[PRODUCT_ID_NAME].str.extract(OPTIONS_NAME_RE)
+        df = parse_options_name(df)
         df[PRODUCT_GROUP_NAME] = df[U_PRODUCT_ID_NAME].str.replace('\d+', '', regex = True)
         df[PRODUCT_GROUP_NAME] = np.where(df[PRODUCT_GROUP_NAME].isnull(),
                                           df[PRODUCT_ID_NAME],
@@ -604,6 +705,7 @@ class RemoteHttpCZCEOptionsData(RemoteHttpCZCEData, IRemoteHttpData):
         df = df[~df[PRODUCT_ID_NAME].str.contains(u'合计', regex = True)]
         df2 = self.get_underlying_close_price(df, date_str)
         df2 = normalize_options_data(df2)
+        df2 = calculate_iv(df2)
         df2 = calculate_siv(df2)
         return df2
 
@@ -620,13 +722,14 @@ class RemoteHttpExpiryDate(IRemoteHttpData):
 
 
 #----------------------------------------------------------------------
-class RemoteDataFactory():
+class RemoteDataFactory(metaclass = Singleton):
 
-    data_path = ''
+    data_path = DATA_ROOT
 
-    def __init__(self, data_path: str):
+    def __init__(self, data_path: str = DATA_ROOT):
         """Constructor"""
         self.data_path = data_path
+        make_sure_dirs_exist(self.data_path)
 
     #----------------------------------------------------------------------
     def create(self, local: str, via: SYNC_DATA_MODE, dates: pd.Index, df_extra: pd.DataFrame):
@@ -638,6 +741,8 @@ class RemoteDataFactory():
             data_class = RemoteHttpCFFEData
         elif SYNC_DATA_MODE.HTTP_DOWNLOAD_CFFE_CALENDAR == via:
             data_class = RemoteHttpCFFETradingCalendar
+        elif SYNC_DATA_MODE.HTTP_DOWNLOAD_CFFE_OPTIONS == via:
+            data_class = RemoteHttpCFFEOptionsData
         elif SYNC_DATA_MODE.HTTP_DOWNLOAD_SHFE == via:
             data_class = RemoteHttpSHFEData
         elif SYNC_DATA_MODE.HTTP_DOWNLOAD_DCE == via:
@@ -649,3 +754,6 @@ class RemoteDataFactory():
         if data_class != None:
             return data_class(self.data_path, local, dates, df_extra)
         raise NotImplementedError
+
+
+remote_data_fac = RemoteDataFactory(DATA_ROOT)

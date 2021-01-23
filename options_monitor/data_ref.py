@@ -1,7 +1,7 @@
 # encoding: UTF-8
 
 from enum import Enum
-import re
+import re, os
 import pandas as pd
 import pandas_market_calendars as market_cal
 
@@ -24,11 +24,13 @@ SCHEDULE_HOUR = 11
 #----------------------------------------------------------------------
 class SYNC_DATA_MODE(Enum):
     HTTP_DOWNLOAD_CFFE          = 11
+    HTTP_DOWNLOAD_CFFE_OPTIONS  = 12
     # trading calendar
     HTTP_DOWNLOAD_CFFE_CALENDAR = 15
     HTTP_DOWNLOAD_SHFE          = 21
     HTTP_DOWNLOAD_SHFE_OPTIONS  = 22
     HTTP_DOWNLOAD_DCE           = 31
+    HTTP_DOWNLOAD_DCE_OPTIONS   = 32
     HTTP_DOWNLOAD_CZCE          = 41
     HTTP_DOWNLOAD_CZCE_OPTIONS  = 42
     # 沪深 300 指数
@@ -55,6 +57,7 @@ U_PRODUCT_ID_NAME = 'u_id' # 标的物
 OPTION_TYPE_NAME = 'otype' # 期权类型 c call p put
 S_PRICE_NAME = 's_price'   # 行权价
 U_PRICE_NAME = 'u_price'   # 标的价
+EXPIRY_NAME = 'expiry'     # 到期日
 
 
 # hv key
@@ -71,7 +74,7 @@ COLUMN_NAMES = [PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, PRE_SETTLE_PRICE_NAME,
                 OPEN_INTEREST_NAME, OI_CHG_NAME, VOLUME_NAME]
 
 O_COLUMN_NAMES = [PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, OPTION_TYPE_NAME, S_PRICE_NAME,
-                  U_PRICE_NAME, CLOSE_PRICE_NAME, IV_NAME, VOLUME_NAME, OPEN_INTEREST_NAME]
+                  U_PRICE_NAME, CLOSE_PRICE_NAME, VOLUME_NAME, OPEN_INTEREST_NAME]
 
 
 # futures names for hv notification
@@ -142,3 +145,14 @@ FUTURE_HV_NAMES = {
 #----------------------------------------------------------------------
 def check_date_in(date_str: str, dates: pd.Index):
     return date_str in dates
+
+
+#----------------------------------------------------------------------
+def make_sure_dirs_exist(path):
+    """确保目录存在"""
+    is_exist = os.path.exists(path)
+    if not is_exist:
+        os.makedirs(path)
+    if not os.path.exists(path):
+        return False
+    return True

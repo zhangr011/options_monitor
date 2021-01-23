@@ -1,13 +1,12 @@
 # encoding: UTF-8
 
 from .data_ref import \
-    DATA_ROOT, DATE_FORMAT, sse_calendar, \
+    DATE_FORMAT, sse_calendar, \
     PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, CLOSE_PRICE_NAME, TOTAL_ROW_KEY, \
     HV_20_NAME, HV_250_NAME, HV_20_250_NAME, HV_PER
 from .utilities_hv import \
     HV_DISTRIBUTION_PERIODS, historical_volatility, calc_percentage
-from .utilities import make_sure_dirs_exist
-from .remote_data import RemoteDataFactory, SYNC_DATA_MODE
+from .data_ref import SYNC_DATA_MODE
 from .logger import logger
 from functools import cached_property
 
@@ -20,7 +19,6 @@ import pandas as pd
 class DataManager():
 
     data_mode = None
-    data_path = DATA_ROOT
     local = ''
 
     #----------------------------------------------------------------------
@@ -41,10 +39,10 @@ class DataManager():
         """download the data"""
         if downloaded is True:
             return
-        make_sure_dirs_exist(self.data_path)
         logger.info(f'start downloading data from {self.data_mode}')
-        data_fac = RemoteDataFactory(self.data_path)
-        self._remote_data = data_fac.create(self.local, self.data_mode, self._trade_dates, self._df_extra)
+        from .remote_data import remote_data_fac
+        self._remote_data = remote_data_fac.create(
+            self.local, self.data_mode, self._trade_dates, self._df_extra)
         self._remote_data.sync_data()
         logger.info('all data downloaded. ')
 
@@ -99,6 +97,7 @@ class CFFECalendarDataManager(DataManager):
     #----------------------------------------------------------------------
     def post_initialized(self):
         """"""
+        super(CFFECalendarDataManager, self).post_initialized()
         self._trading_calendars = tcs.get_calendar('XSHG')
         self._trading_sessions = self._trading_calendars.all_sessions
 
@@ -135,7 +134,10 @@ class CFFECalendarDataManager(DataManager):
     #----------------------------------------------------------------------
     def check_open(self, date_str: str):
         """check if the market is opened. """
-        return date_str in self._trading_sessions
+        checked = date_str in self._trading_sessions
+        if checked is True:
+            return self.check_open2(date_str)
+        return checked
 
 
 #----------------------------------------------------------------------
@@ -147,6 +149,13 @@ class CFFEDataManager(DataManager):
 
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_CFFE
     local = 'cffe'
+
+
+#----------------------------------------------------------------------
+class CFFEOptionsDataManager(DataManager):
+
+    data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_CFFE_OPTIONS
+    local = 'cffe_options'
 
 
 #----------------------------------------------------------------------

@@ -91,7 +91,7 @@ def calc_remained_days(name: str, full_date: str, current: str):
     """calculate the days remaining of options"""
     expiry_date = get_expiry_date(name, full_date)
     intervals = datetime.strptime(expiry_date, DATE_FORMAT) - datetime.strptime(current, DATE_FORMAT)
-    days = intervals.days
+    days = intervals.days + 1
     if days <= 0:
         raise ValueError(f'remained days {expiry_date} - {current},  {days} out of range. ')
     return days

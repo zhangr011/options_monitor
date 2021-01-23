@@ -2,23 +2,10 @@
 
 import unittest as ut
 
-try:
-    import black_76_cython as black_76
-    import binomial_tree_cython as binomial_tree
-    import black_scholes_cython as black_scholes
-except ImportError:
-    from .pricing import (
-        black_76, binomial_tree, black_scholes
-    )
-    logger.info("Faile to import cython option pricing model, please rebuild with cython in cmd.")
-    logger.info('pip3 install ./pricing/cython_model/binomial_tree_cython')
-    logger.info('pip3 install ./pricing/cython_model/black_76_cython')
-    logger.info('pip3 install ./pricing/cython_model/black_scholes_cython')
-
 from options_monitor.data_ref import \
-    TOTAL_ROW_KEY, IV_NAME, PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, \
+    INDEX_KEY, TOTAL_ROW_KEY, IV_NAME, PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, \
     S_PRICE_NAME, U_PRICE_NAME, CLOSE_PRICE_NAME, VOLUME_NAME
-from options_monitor.remote_data import calculate_siv
+from options_monitor.remote_data import calculate_iv, calculate_siv
 from options_monitor.utilities_options import \
     calc_iv, fill_the_date, get_expiry_date, oc_mgr, calc_remained_days, \
     OPTIONS_TYPE_CALL, OPTIONS_TYPE_PUT
@@ -33,17 +20,23 @@ class TestOptionPrice(ut.TestCase):
     #----------------------------------------------------------------------
     def testSIV(self):
         """"""
-        df = pd.DataFrame(np.array([['01C30', 'i', 30, 33, 4.5, 50, 0.34],
-                                    ['01C35', 'i', 35, 33, 1.5, 90, 0.28],
-                                    ['04C35', 'i', 35, 33, 2.5, 55, 0.3],
-                                    ['04C40', 'i', 40, 33, 1.5, 5, 0.38],
-                                    [TOTAL_ROW_KEY, 'i', 0, 0, 0, 0, 0]]),
-                          columns = [PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, S_PRICE_NAME, U_PRICE_NAME,
+        current = '2020-11-04'
+        df = pd.DataFrame(np.array([[current, 'cu2103C30', 'cu', 30, 33, 4.5, 50, 0.34],
+                                    [current, 'cu2103C35', 'cu', 35, 33, 1.5, 90, 0.28],
+                                    [current, 'cu2105C35', 'cu', 35, 33, 2.5, 55, 0.3],
+                                    [current, 'cu2105C40', 'cu', 40, 33, 1.5, 5, 0.38],
+                                    [current, TOTAL_ROW_KEY, 'cu', 0, 0, 0, 0, 0]]),
+                          columns = [INDEX_KEY, PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, S_PRICE_NAME, U_PRICE_NAME,
                                      CLOSE_PRICE_NAME, VOLUME_NAME, IV_NAME])
+        df.set_index(INDEX_KEY, inplace = True)
         df[S_PRICE_NAME] = df[S_PRICE_NAME].astype(float)
         df[U_PRICE_NAME] = df[U_PRICE_NAME].astype(float)
+        df[CLOSE_PRICE_NAME] = df[CLOSE_PRICE_NAME].astype(float)
         df[VOLUME_NAME] = df[VOLUME_NAME].astype(int)
         df[IV_NAME] = df[IV_NAME].astype(float)
+        df_iv = calculate_iv(df.copy())
+        ivs = df_iv[IV_NAME].tolist()
+        self.assertEqual([0.4109, 0.3242, 0.3803, 0.416, 0], ivs)
         df = calculate_siv(df)
         self.assertEqual(0.298, df.iloc[-1][IV_NAME])
 
@@ -117,9 +110,9 @@ class TestOptionPrice(ut.TestCase):
         """"""
         current = '2021-01-22'
         days = calc_remained_days('IO', '2021-02-01', current)
-        self.assertEqual(28, days)
+        self.assertEqual(29, days)
         days = calc_remained_days('IO', '2021-06-01', current)
-        self.assertEqual(147, days)
+        self.assertEqual(148, days)
         ivc = oc_mgr.calc_iv('IO2106C5400', 350.6, 5569.78, current)
         self.assertAlmostEqual(19.17, ivc * 100, delta = 0.52) # too much
         ivp = oc_mgr.calc_iv('IO2106P5600', 356.6, 5579.78, current)
@@ -130,42 +123,42 @@ class TestOptionPrice(ut.TestCase):
         """"""
         current = '2021-01-22'
         days = calc_remained_days('cu', '2021-03-01', current)
-        self.assertEqual(31, days)
+        self.assertEqual(32, days)
         ivc = oc_mgr.calc_iv('cu2103C57000', 2220, 58810, current)
-        self.assertAlmostEqual(16.27, ivc * 100, delta = 0.2)
+        self.assertAlmostEqual(16.27, ivc * 100, delta = 0.3)
         ivc = oc_mgr.calc_iv('cu2103C58000', 1550, 58810, current)
         self.assertAlmostEqual(16.35, ivc * 100, delta = 0.2)
         ivp = oc_mgr.calc_iv('cu2103P60000', 1896, 58810, current)
-        self.assertAlmostEqual(17.70, ivp * 100, delta = 0.2)
+        self.assertAlmostEqual(17.70, ivp * 100, delta = 0.4) # too much
         ivp = oc_mgr.calc_iv('cu2103P59000', 1234, 58810, current)
-        self.assertAlmostEqual(16.78, ivp * 100, delta = 0.3) # too much
+        self.assertAlmostEqual(16.78, ivp * 100, delta = 0.55) # too much
         days = calc_remained_days('au', '2021-04-01', current)
-        self.assertEqual(62, days)
+        self.assertEqual(63, days)
         ivc = oc_mgr.calc_iv('au2104P396', 14.22, 390, current)
-        self.assertAlmostEqual(17.81, ivc * 100, delta = 0.4) # too much
+        self.assertAlmostEqual(17.81, ivc * 100, delta = 0.52) # too much
         ivp = oc_mgr.calc_iv('au2104C384', 14.8, 390, current)
-        self.assertAlmostEqual(19.06, ivp * 100, delta = 0.5) # too much
+        self.assertAlmostEqual(19.06, ivp * 100, delta = 0.61) # too much
 
     #----------------------------------------------------------------------
     def testDCEOptionPrice(self):
         """"""
         current = '2021-01-22'
         days = calc_remained_days('pp', '2021-05-01', current)
-        self.assertEqual(76, days)
+        self.assertEqual(77, days)
         ivc = oc_mgr.calc_iv('pp2105C7700', 618, 8170, current)
-        self.assertAlmostEqual(24.04, ivc * 100, delta = 0.56) # too much
+        self.assertAlmostEqual(24.04, ivc * 100, delta = 0.7) # too much
         ivp = oc_mgr.calc_iv('pp2105P8100', 272, 8170, current)
-        self.assertAlmostEqual(21.63, ivp * 100, delta = 0.9)  # too much
+        self.assertAlmostEqual(21.63, ivp * 100, delta = 1.01)  # too much
 
     #----------------------------------------------------------------------
     def testCZCEOptionPrice(self):
         """"""
         current = '2021-01-22'
-        self.assertEqual(12, calc_remained_days('SR', '2021-03-01', current))
+        self.assertEqual(13, calc_remained_days('SR', '2021-03-01', current))
         ivc = oc_mgr.calc_iv('SR103C5000', 224, 5216, current)
-        self.assertAlmostEqual(18.56, ivc * 100, delta = 0.22)
+        self.assertAlmostEqual(18.56, ivc * 100, delta = 0.51) # too much
         ivp = oc_mgr.calc_iv('SR103P5300', 127.5, 5216, current)
-        self.assertAlmostEqual(21.02, ivp * 100, delta = 0.6) # too much
+        self.assertAlmostEqual(21.02, ivp * 100, delta = 1.4) # too too too much
 
 
     def testOptionPrice2(self):
@@ -186,6 +179,11 @@ class TestOptionPrice(ut.TestCase):
         ivp = calc_iv(gid, 55, close, 810, 15, OPTIONS_TYPE_PUT)
         total = 1763 + 261
         self.assertAlmostEqual(41.22, (ivc + ivp) / 2 * 100, delta = 0.8) # too much
+        ivc2 = calc_iv(gid, 0.2, close, 780, 2, OPTIONS_TYPE_CALL)
+        ivc = calc_iv(gid, 0.2, close, 780, 1, OPTIONS_TYPE_CALL)
+        # test for days left 0
+        self.assertEqual(10.97, ivc2 * 100)
+        self.assertEqual(15.52, ivc * 100)
         # 2021-01-19,ZC109C650,ZC,C,650.0,639.6,59.5,28.65,1,1
         ivc = calc_iv(gid, 59.5, 639.6, 650, 197, OPTIONS_TYPE_CALL)
         # 2021-01-19,ZC109P650,ZC,P,650.0,639.6,48.5,28.65,11,7

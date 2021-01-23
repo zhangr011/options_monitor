@@ -15,6 +15,8 @@ class TestCFFECalendarManager(ut.TestCase):
         self.assertEqual(calendar1.size, calendar2.size)
         self.assertEqual(False, calendar_manager.check_open('2018-01-01'))
         self.assertEqual(False, calendar_manager.check_open('2020-10-08'))
+        # special holiday for covid-19
+        self.assertEqual(False, calendar_manager.check_open('2020-01-31'))
         self.assertEqual(False, calendar_manager.check_open('2021-01-01'))
         # not work for weekend by cffe calendar
         self.assertEqual(True, calendar_manager.check_open2('2021-01-02'))

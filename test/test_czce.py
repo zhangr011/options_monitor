@@ -19,7 +19,10 @@ class TestCZCEDataManager(ut.TestCase):
         _li, df = mgr._remote_data.get_last_index()
         # self.assertEqual(False, (df[CLOSE_PRICE_NAME] == 0).any())
         mgr2 = CZCEOptionsDataManager(dates, df)
+        # download_raw_data to set _remote_data, so we need to do it before drop
         mgr2.download_raw_data()
+        # mgr2._remote_data.drop_local_last_date_data()
+        # mgr2.download_raw_data()
 
 
 if __name__ == '__main__':
