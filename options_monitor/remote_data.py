@@ -632,13 +632,38 @@ class RemoteHttpDCEData(IRemoteHttpData):
     # http://www.dce.com.cn/publicweb/quotesdata/dayQuotesCh.html
     remote_path = "http://www.dce.com.cn/publicweb/quotesdata/dayQuotesCh.html"
     request_post = True
+    # for futures
+    trade_type = '0'
+    instruments_map = {
+        u'玉米' : 'c',
+        u'玉米淀粉' : 'cs',
+        u'豆一' : 'a',
+        u'豆二' : 'b',
+        u'豆粕' : 'm',
+        u'豆油' : 'y',
+        u'棕榈油' : 'p',
+        u'纤维板' : 'fb',
+        u'胶合板' : 'bb',
+        u'鸡蛋' : 'jd',
+        u'粳米' : 'rr',
+        u'生猪' : 'lh',
+        u'聚乙烯' : 'l',
+        u'聚氯乙烯' : 'v',
+        u'聚丙烯' : 'pp',
+        u'焦炭' : 'j',
+        u'焦煤' : 'jm',
+        u'铁矿石' : 'i',
+        u'乙二醇' : 'eg',
+        u'苯乙烯' : 'eb',
+        u'液化石油气' : 'pg'
+    }
 
     #----------------------------------------------------------------------
     def get_remote_path(self, date: str):
         """query the remote data"""
         date_list = date.split('-')
         data = {'dayQuotes.variety': 'all',
-                'dayQuotes.trade_type': '0',
+                'dayQuotes.trade_type': self.trade_type,
                 'year': date_list[0],
                 'month': str(int(date_list[1]) - 1),
                 'day': date_list[2]}
@@ -669,21 +694,58 @@ class RemoteHttpDCEData(IRemoteHttpData):
         df = normalize_history_data(df, u'总计')
         # clear the group name
         df[PRODUCT_GROUP_NAME] = df[PRODUCT_GROUP_NAME].str.replace(u'小计', '', regex = True)
+        df = self.fix_product_id(df)
         df = calculate_index(df)
+        return df
+
+    #----------------------------------------------------------------------
+    def fix_product_id(self, df: pd.DataFrame):
+        """"""
+        df[PRODUCT_ID_NAME] = df.apply(
+            lambda row: row[PRODUCT_ID_NAME] if row[PRODUCT_ID_NAME] == TOTAL_ROW_KEY else self.instruments_map.get(row[PRODUCT_GROUP_NAME], '') + row[PRODUCT_ID_NAME],
+            axis = 1)
         return df
 
 
 #----------------------------------------------------------------------
 class RemoteHttpDCEOptionsData(RemoteHttpDCEData):
 
-    #
-    remote_path = ''
+    # http://www.dce.com.cn/publicweb/quotesdata/dayQuotesCh.html
+    remote_path = "http://www.dce.com.cn/publicweb/quotesdata/dayQuotesCh.html"
     request_post = True
+    # for options
+    trade_type = '1'
 
     #----------------------------------------------------------------------
     def do_data_handle(self, data, date_str: str):
         """"""
-        pass
+        df = get_table_soup(data, GB_ENCODING, False)
+        df[INDEX_KEY] = date_str
+        df.set_index(INDEX_KEY, inplace = True)
+        df.rename({
+            u'合约名称' : PRODUCT_ID_NAME,
+            u'商品名称' : PRODUCT_GROUP_NAME,
+            u'前结算价' : PRE_SETTLE_PRICE_NAME,
+            u'开盘价'   : OPEN_PRICE_NAME,
+            u'最高价'   : HIGH_PRICE_NAME,
+            u'最低价'   : LOW_PRICE_NAME,
+            u'收盘价'   : CLOSE_PRICE_NAME,
+            u'结算价'   : SETTLE_PRICE_NAME,
+            u'持仓量'   : OPEN_INTEREST_NAME,
+            u'持仓量变化' : OI_CHG_NAME,
+            u'成交量'   : VOLUME_NAME}, axis = 1, inplace = True)
+        # replace the total row's key name
+        df[PRODUCT_ID_NAME] = np.where(
+            df[PRODUCT_GROUP_NAME].str.contains(u'小计', regex = True),
+            TOTAL_ROW_KEY, df[PRODUCT_ID_NAME])
+        # clear the group name
+        df[PRODUCT_GROUP_NAME] = df[PRODUCT_GROUP_NAME].str.replace(u'小计', '', regex = True)
+        df = parse_options_name(df, OPTIONS_NAME_DASH_RE)
+        df2 = self.get_underlying_close_price(df, date_str)
+        df2 = normalize_options_data(df2)
+        df2 = calculate_iv(df2)
+        df2 = calculate_siv(df2)
+        return df2
 
 
 #----------------------------------------------------------------------
@@ -812,6 +874,8 @@ class RemoteDataFactory(metaclass = Singleton):
             data_class = RemoteHttpSHFEOptionsData
         elif SYNC_DATA_MODE.HTTP_DOWNLOAD_DCE == via:
             data_class = RemoteHttpDCEData
+        elif SYNC_DATA_MODE.HTTP_DOWNLOAD_DCE_OPTIONS == via:
+            data_class = RemoteHttpDCEOptionsData
         elif SYNC_DATA_MODE.HTTP_DOWNLOAD_CZCE == via:
             data_class = RemoteHttpCZCEData
         elif SYNC_DATA_MODE.HTTP_DOWNLOAD_CZCE_OPTIONS == via:

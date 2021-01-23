@@ -180,6 +180,13 @@ class DCEDataManager(DataManager):
 
 
 #----------------------------------------------------------------------
+class DCEOptionsDataManager(DataManager):
+
+    data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_DCE_OPTIONS
+    local = 'dce_options'
+
+
+#----------------------------------------------------------------------
 class CZCEDataManager(DataManager):
 
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_CZCE
