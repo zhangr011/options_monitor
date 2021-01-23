@@ -615,13 +615,13 @@ class RemoteHttpSHFEOptionsData(RemoteHttpSHFEData):
             'VOLUME' : VOLUME_NAME}, axis = 1, inplace = True)
         # replace the total row's key name
         df = normalize_total_key(df, u'小计')
+        df[PRODUCT_ID_NAME] = df[PRODUCT_ID_NAME].str.strip()
+        df[PRODUCT_GROUP_NAME] = df[PRODUCT_GROUP_NAME].str.strip()
         df = parse_options_name(df)
         # drop the final statistics row
         df = df[~df[PRODUCT_ID_NAME].str.contains(u'合计', regex = True)]
         df2 = self.get_underlying_close_price(df, date_str)
         df2 = normalize_options_data(df2)
-        import pdb
-        pdb.set_trace()
         df2 = calculate_iv(df2)
         df2 = calculate_siv(df2)
         return df2
