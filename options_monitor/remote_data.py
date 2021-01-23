@@ -133,10 +133,10 @@ def normalize_options_data(df: pd.DataFrame, final_key: str = u'总计'):
     # clear the final rows
     df = df[(df[PRODUCT_ID_NAME] != final_key) & (df[PRODUCT_GROUP_NAME] != final_key)]
     df.replace('', '0', regex = True, inplace = True)
-    # clear empty volume
     df = df[df[VOLUME_NAME].notnull()]
     df = to_numeric(df, VOLUME_NAME, int)
-    df = df[df[VOLUME_NAME] > 0]
+    # clear empty volume, 'total' key must be remained
+    df = df[(df[VOLUME_NAME] > 0) | (df[PRODUCT_ID_NAME] == TOTAL_ROW_KEY)]
     df = to_numeric(df, OPEN_INTEREST_NAME, int)
     # normalize price
     df = to_numeric(df, S_PRICE_NAME, float)
@@ -197,6 +197,8 @@ def calculate_iv(df: pd.DataFrame, total_key: str = TOTAL_ROW_KEY):
 def calculate_siv(df_in: pd.DataFrame, total_key: str = TOTAL_ROW_KEY):
     """"""
     df = df_in[df_in[PRODUCT_ID_NAME] != TOTAL_ROW_KEY]
+    # filter the normal iv
+    df = df[df[IV_NAME] > 0.01]
     df[STRIKE_BIAS_NAME] = abs(df[S_PRICE_NAME] - df[U_PRICE_NAME]) / df[U_PRICE_NAME]
     df[STRIKE_BIAS_NAME] = np.where(df[STRIKE_BIAS_NAME] > OPTION_BIAS_AA,
                                     0,

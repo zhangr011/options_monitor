@@ -21,7 +21,10 @@ class TestCFFEData(ut.TestCase):
         _li, df_extra = mgr_index._remote_data.get_last_index()
         mgr2 = CFFEOptionsDataManager(dates, df_extra)
         mgr2.download_raw_data()
-
+        mgr2._remote_data.drop_local_last_date_data()
+        mgr2.download_raw_data()
+        _li, df = mgr2._remote_data.get_last_index()
+        df
 
 if __name__ == '__main__':
     ut.main()

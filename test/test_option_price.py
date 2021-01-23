@@ -25,6 +25,7 @@ class TestOptionPrice(ut.TestCase):
                                     [current, 'cu2103C35', 'cu', 35, 33, 1.5, 90, 0.28],
                                     [current, 'cu2105C35', 'cu', 35, 33, 2.5, 55, 0.3],
                                     [current, 'cu2105C40', 'cu', 40, 33, 1.5, 5, 0.38],
+                                    [current, 'cu2105C30', 'cu', 45, 33, 3.5, 5, 0],
                                     [current, TOTAL_ROW_KEY, 'cu', 0, 0, 0, 0, 0]]),
                           columns = [INDEX_KEY, PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, S_PRICE_NAME, U_PRICE_NAME,
                                      CLOSE_PRICE_NAME, VOLUME_NAME, IV_NAME])
@@ -36,9 +37,13 @@ class TestOptionPrice(ut.TestCase):
         df[IV_NAME] = df[IV_NAME].astype(float)
         df_iv = calculate_iv(df.copy())
         ivs = df_iv[IV_NAME].tolist()
-        self.assertEqual([0.4109, 0.3242, 0.3803, 0.416, 0], ivs)
+        self.assertEqual([0.4109, 0.3242, 0.3803, 0.416, 0.1992, 0], ivs)
+        # test for iv of 0
         df = calculate_siv(df)
         self.assertEqual(0.298, df.iloc[-1][IV_NAME])
+        df2 = df[df[PRODUCT_ID_NAME] != 'cu2105C30']
+        df2 = calculate_siv(df2)
+        self.assertEqual(0.298, df2.iloc[-1][IV_NAME])
 
 
     #----------------------------------------------------------------------
@@ -117,6 +122,10 @@ class TestOptionPrice(ut.TestCase):
         self.assertAlmostEqual(19.17, ivc * 100, delta = 0.52) # too much
         ivp = oc_mgr.calc_iv('IO2106P5600', 356.6, 5579.78, current)
         self.assertAlmostEqual(25.02, ivp * 100, delta = 0.25)
+        # 2021-01-22,IO2112-C-4400,IO,C,4400.0,5569.78,1155.0,4,46,0.0
+        ivc = oc_mgr.calc_iv('IO2112-C-4400', 1155, 5569.78, '2021-01-22')
+        # ivc = oc_mgr.calc_iv('IO2112-C-4400', 1172, 5569.78, '2021-01-22')
+        self.assertEqual(0, ivc * 100)
 
     #----------------------------------------------------------------------
     def testSHFEOptionPrice(self):
