@@ -19,7 +19,7 @@ import threadpool
 
 pd.set_option('mode.chained_assignment', None)
 
-ANALYZE_WHEN_START = True
+ANALYZE_WHEN_START = False
 SEND_MSG           = True
 
 #----------------------------------------------------------------------
