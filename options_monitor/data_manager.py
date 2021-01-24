@@ -2,16 +2,18 @@
 
 from .data_ref import \
     DATE_FORMAT, sse_calendar, \
-    PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, CLOSE_PRICE_NAME, TOTAL_ROW_KEY, \
-    HV_20_NAME, HV_250_NAME, HV_20_250_NAME, HV_PER
+    INDEX_KEY, PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, \
+    CLOSE_PRICE_NAME, TOTAL_ROW_KEY, \
+    HV_20_NAME, HV_250_NAME, HV_20_250_NAME, HV_PER, IV_NAME, IV_PER
 from .utilities_hv import \
     HV_DISTRIBUTION_PERIODS, historical_volatility, calc_percentage
 from .data_ref import SYNC_DATA_MODE
 from .logger import logger
 from functools import cached_property
 
-import trading_calendars as tcs
 import os, datetime
+import trading_calendars as tcs
+import numpy as np
 import pandas as pd
 
 
@@ -46,6 +48,29 @@ class DataManager():
         self._remote_data.sync_data()
         logger.info('all data downloaded. ')
 
+    #----------------------------------------------------------------------
+    def get_products_dataframe(self):
+        """get the products' dataframe"""
+        lindex, df = self._remote_data.get_last_index()
+        df = df[df[PRODUCT_ID_NAME] == TOTAL_ROW_KEY]
+        df.reset_index(inplace = True)
+        df.drop_duplicates(subset = [INDEX_KEY, PRODUCT_ID_NAME, PRODUCT_GROUP_NAME],
+                           keep = 'last', inplace = True)
+        df.set_index(INDEX_KEY, inplace = True)
+        group = df.groupby(PRODUCT_GROUP_NAME)
+        dfs = []
+        for pid in group.groups.keys():
+            dfs.append(group.get_group(pid))
+        return dfs, df
+
+    #----------------------------------------------------------------------
+    def analyze(self):
+        """"""
+        pass
+
+
+#----------------------------------------------------------------------
+class FuturesDataManager(DataManager):
 
     #----------------------------------------------------------------------
     def analyze_one_hv(self, df: pd.DataFrame):
@@ -59,24 +84,58 @@ class DataManager():
     #----------------------------------------------------------------------
     def analyze(self):
         """analyze the data"""
-        products = self.get_products_dataframe()
+        products, df_all = self.get_products_dataframe()
         dfs = map(lambda df: self.analyze_one_hv(df), products)
-        return list(dfs)
-
-    #----------------------------------------------------------------------
-    def get_products_dataframe(self):
-        """get the products' dataframe"""
-        lindex, df = self._remote_data.get_last_index()
-        df = df[df[PRODUCT_ID_NAME] == TOTAL_ROW_KEY]
-        group = df.groupby(PRODUCT_GROUP_NAME)
-        dfs = []
-        for pid in group.groups.keys():
-            dfs.append(group.get_group(pid))
-        return dfs
+        return list(dfs), df_all
 
 
 #----------------------------------------------------------------------
-class CSIndex000300DataManager(DataManager):
+class OptionsDataManager(DataManager):
+
+    futures_options_map = {}
+
+    #----------------------------------------------------------------------
+    def get_options_id(self, fid: str):
+        """get the options' product id"""
+        return self.futures_options_map.get(fid, None)
+
+    #----------------------------------------------------------------------
+    def get_options_df(self, fid: str, options_dfs: list):
+        """"""
+        oid = self.get_options_id(fid)
+        if oid is None:
+            oid = fid
+        for o_df in options_dfs:
+            if o_df[PRODUCT_GROUP_NAME][-1] == oid:
+                return o_df[[IV_NAME]]
+        return None
+
+    #----------------------------------------------------------------------
+    def join_options(self, futures_df: list, options_df: list):
+        """"""
+        joined = []
+        for df_f in futures_df:
+            futures_id = df_f[PRODUCT_GROUP_NAME][-1]
+            o_df = self.get_options_df(futures_id, options_df)
+            if o_df is None:
+                df_f[IV_NAME] = np.nan
+            else:
+                df_f = df_f.join(o_df, how = 'left')
+            df_f[IV_PER] = calc_percentage(df_f[IV_NAME])
+            joined.append(df_f)
+        return joined
+
+    #----------------------------------------------------------------------
+    def analyze(self, futures_dfs: list):
+        """analyze the data"""
+        options, df_all = self.get_products_dataframe()
+        dfs = self.join_options(futures_dfs, options)
+        # merge the options' data into futures
+        return dfs, df_all
+
+
+#----------------------------------------------------------------------
+class CSIndex000300DataManager(FuturesDataManager):
 
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_CSINDEX_000300
     local = 'csindex_000300'
@@ -85,7 +144,7 @@ class CSIndex000300DataManager(DataManager):
     def get_products_dataframe(self):
         """"""
         lindex, df = self._remote_data.get_last_index()
-        return [df]
+        return [df], df
 
 
 #----------------------------------------------------------------------
@@ -145,56 +204,62 @@ calendar_manager = CFFECalendarDataManager()
 
 
 #----------------------------------------------------------------------
-class CFFEDataManager(DataManager):
+class CFFEDataManager(FuturesDataManager):
 
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_CFFE
     local = 'cffe'
 
 
 #----------------------------------------------------------------------
-class CFFEOptionsDataManager(DataManager):
+class CFFEOptionsDataManager(OptionsDataManager):
 
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_CFFE_OPTIONS
     local = 'cffe_options'
+    futures_options_map = {'csidx300' : 'IO'}
 
 
 #----------------------------------------------------------------------
-class SHFEDataManager(DataManager):
+class SHFEDataManager(FuturesDataManager):
 
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_SHFE
     local = 'shfe'
 
 
 #----------------------------------------------------------------------
-class SHFEOptionsDataManager(DataManager):
+class SHFEOptionsDataManager(OptionsDataManager):
 
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_SHFE_OPTIONS
     local = 'shfe_options'
 
+    #----------------------------------------------------------------------
+    def get_options_id(self, fid: str):
+        """get the options' product id"""
+        return fid.replace('_f', '')
+
 
 #----------------------------------------------------------------------
-class DCEDataManager(DataManager):
+class DCEDataManager(FuturesDataManager):
 
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_DCE
     local = 'dce'
 
 
 #----------------------------------------------------------------------
-class DCEOptionsDataManager(DataManager):
+class DCEOptionsDataManager(OptionsDataManager):
 
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_DCE_OPTIONS
     local = 'dce_options'
 
 
 #----------------------------------------------------------------------
-class CZCEDataManager(DataManager):
+class CZCEDataManager(FuturesDataManager):
 
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_CZCE
     local = 'czce'
 
 
 #----------------------------------------------------------------------
-class CZCEOptionsDataManager(DataManager):
+class CZCEOptionsDataManager(OptionsDataManager):
 
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_CZCE_OPTIONS
     local = 'czce_options'

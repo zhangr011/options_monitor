@@ -64,7 +64,8 @@ EXPIRY_NAME = 'expiry'     # 到期日
 HV_20_NAME = 'hvm'
 HV_250_NAME = 'hvy'
 HV_20_250_NAME = 'hvm/y'
-HV_PER = 'per'
+HV_PER = 'hp'
+IV_PER = 'ip'
 
 # total key for future's index
 TOTAL_ROW_KEY = 'total'

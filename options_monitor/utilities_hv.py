@@ -72,9 +72,9 @@ def percent_distribution(vix: pd.Series, val: float = None):
 
 
 #----------------------------------------------------------------------
-def calc_percentage(hv_20: pd.Series):
+def calc_percentage(volatility: pd.Series):
     """"""
-    return hv_20.rolling(HV_DISTRIBUTION_PERIODS).apply(lambda rows: percent_distribution(rows))
+    return volatility.rolling(HV_DISTRIBUTION_PERIODS).apply(lambda rows: percent_distribution(rows))
 
 
 #----------------------------------------------------------------------
