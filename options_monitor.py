@@ -5,7 +5,7 @@ from options_monitor.data_ref import SCHEDULE_HOUR, DATE_FORMAT
 from options_monitor.utilities import mk_notification
 from options_monitor.utilities_hv import sort_hv20250
 from options_monitor.schedule_manager import ScheduleManager
-from options_monitor.util_dingding import send_md_msg
+from options_monitor.util_dingding import send_html_msg
 from options_monitor.data_manager import \
     CSIndex000300DataManager, CFFEDataManager, SHFEDataManager, \
     DCEDataManager, CZCEDataManager, \
@@ -14,7 +14,10 @@ from options_monitor.data_manager import \
 from options_monitor.logger import logger
 from datetime import datetime
 from time import sleep
+import pandas as pd
 import threadpool
+
+pd.set_option('mode.chained_assignment', None)
 
 
 #----------------------------------------------------------------------
@@ -31,7 +34,7 @@ class MonitorScheduleManager(ScheduleManager):
         now_date_str = datetime.now().strftime(DATE_FORMAT)
         if not calendar_manager.check_open(now_date_str):
             logger.info(f'market is closed: {now_date_str}')
-            # return self.clear_and_return_true()
+            return self.clear_and_return_true()
         # do download data and analyze
         csindex000300_mgr = CSIndex000300DataManager(dates)
         cffe_mgr = CFFEDataManager(dates)
@@ -68,10 +71,8 @@ class MonitorScheduleManager(ScheduleManager):
         czce_o_dfs, _czce_o_all = czce_options_mgr.analyze(czce_dfs)
         all_dfs = cffe_o_dfs + shfe_o_dfs + dce_o_dfs + czce_o_dfs
         this_date, final_df = sort_hv20250(all_dfs)
-        import pdb
-        pdb.set_trace()
-        md_msg = mk_notification(final_df)
-        send_md_msg(f'{this_date} hv', md_msg)
+        stat_df = mk_notification(final_df)
+        send_html_msg(this_date, stat_df)
         logger.info('schedule task done. ')
         return self.clear_and_return_true()
 
@@ -81,7 +82,7 @@ class MonitorScheduleManager(ScheduleManager):
 
 
 if __name__ == '__main__':
-    mgr = MonitorScheduleManager(True)
+    mgr = MonitorScheduleManager(False)
     logger.info('options monitor started. ')
     while True:
         sleep(1)

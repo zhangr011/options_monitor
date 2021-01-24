@@ -4,7 +4,7 @@ import os, sys, datetime, hashlib, glob, re
 import pandas as pd
 import numpy as np
 from .data_ref import DATE_FORMAT, DATE_FORMAT_PATTERN, DATA_ROOT, \
-    INDEX_KEY, PRODUCT_GROUP_NAME, FUTURE_HV_NAMES, HV_250_NAME, HV_PER
+    INDEX_KEY, PRODUCT_GROUP_NAME, FUTURE_HV_NAMES, HV_250_NAME, HV_PER, IV_PER
 
 from functools import reduce, cached_property
 from .logger import logger
@@ -167,31 +167,6 @@ def calc_percentage(vx: pd.DataFrame):
 
 
 #----------------------------------------------------------------------
-def historical_max_min_per(df: pd.DataFrame):
-    """mark the historical max an min in the dataframe"""
-    # according to:
-    # https://stackoverflow.com/questions/61759149/apply-a-function-on-a-dataframe-that-depend-on-the-previous-row-values
-    # NOTE: I rename the variables with _ to avoid using builtin method names
-    max_ = sys.float_info.min
-    min_ = sys.float_info.max
-    # list for the results
-    l_res = []
-    for value in df.Close.to_numpy():
-        # iterate over the values
-        if value >= max_:
-            max_ = value
-        if value <= min_:
-            min_ = value
-        # append the results in the list
-        ratio = 100
-        if max_ - min_ > 0:
-            ratio = round((value - min_) * 100 / (max_ - min_))
-        l_res.append([max_, min_, ratio])
-    # create the three columns outside of the loop
-    df[['Max', 'Min', 'mper']] = pd.DataFrame(l_res, index = df.index)
-
-
-#----------------------------------------------------------------------
 def notify_format(df: pd.DataFrame):
     """format the dataframe for notification"""
     return df.to_markdown()
@@ -214,11 +189,13 @@ def mk_notification(df: pd.DataFrame):
     df = df[df[PRODUCT_GROUP_NAME].notnull()]
     df.set_index(PRODUCT_GROUP_NAME, inplace = True)
     df.index.rename('name', inplace = True)
-    df.drop([HV_250_NAME], axis = 1, inplace = True)
-    df2 = df.applymap(lambda x: f"{x:.1%}".strip('%') if isinstance(x, float) else x)
+    df2 = df.applymap(lambda x: f"{x:.1%}".strip('%') if isinstance(x, float) else x,
+                      na_action = 'ignore')
     df2[HV_PER] = df[HV_PER].apply(lambda x: f"{int(x)}" if isinstance(x, float) else x)
-    content = f'{notify_format(df2)}'
-    return notify_format_content(content)
+    df2[IV_PER] = pd.to_numeric(df[IV_PER], errors = 'coerce')
+    df2.fillna('-', inplace = True)
+    df2[IV_PER] = df2[IV_PER].apply(lambda x: f"{int(x)}" if isinstance(x, float) else x)
+    return df2
 
 
 #----------------------------------------------------------------------

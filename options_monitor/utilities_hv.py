@@ -1,9 +1,11 @@
 # encoding: UTF-8
 
 from .data_ref import PRODUCT_GROUP_NAME, CLOSE_PRICE_NAME, \
-    HV_20_NAME, HV_250_NAME, HV_20_250_NAME, HV_PER
+    HV_20_NAME, HV_250_NAME, HV_20_250_NAME, IV_NAME, \
+    HV_PER, HV_MIN, HV_MAX, IV_PER, IV_MIN, IV_MAX
 import pandas as pd
 import numpy as np
+import sys
 
 
 # about 1 years
@@ -78,6 +80,31 @@ def calc_percentage(volatility: pd.Series):
 
 
 #----------------------------------------------------------------------
+def historical_max_min(df: pd.DataFrame, column_name: str, max_key: str, min_key: str):
+    """mark the historical max an min in the dataframe"""
+    # according to:
+    # https://stackoverflow.com/questions/61759149/apply-a-function-on-a-dataframe-that-depend-on-the-previous-row-values
+    # NOTE: I rename the variables with _ to avoid using builtin method names
+    max_ = sys.float_info.min
+    min_ = sys.float_info.max
+    # list for the results
+    l_res = []
+    for value in df[column_name].to_numpy():
+        # iterate over the values
+        if value >= max_:
+            max_ = value
+        if value <= min_:
+            min_ = value
+            # append the results in the list
+        if sys.float_info.min == max_ and sys.float_info.max == min_:
+            l_res.append(['-', '-'])
+        else:
+            l_res.append([max_, min_])
+        # create the three columns outside of the loop
+    df[[max_key, min_key]] = pd.DataFrame(l_res, index = df.index)
+
+
+#----------------------------------------------------------------------
 def sort_hv20250(dfs: list):
     """df list"""
     date = None
@@ -87,8 +114,9 @@ def sort_hv20250(dfs: list):
             date = df.index[-1]
         products.append(df[df.index == date])
     final = pd.concat(products)
-    final = final[[PRODUCT_GROUP_NAME, HV_20_NAME, HV_250_NAME, HV_20_250_NAME, HV_PER]]
-    final[HV_PER].fillna('', inplace = True)
-    final.dropna(inplace = True)
+    final = final[[PRODUCT_GROUP_NAME, HV_20_NAME, HV_MIN, HV_MAX, HV_250_NAME,
+                   IV_NAME, IV_MIN, IV_MAX, HV_PER, IV_PER, HV_20_250_NAME]]
+    # final[HV_PER].fillna('', inplace = True)
+    final.dropna(subset = [HV_20_250_NAME], inplace = True)
     final.sort_values(by = HV_20_250_NAME, ascending = False, inplace = True)
     return date, final

@@ -4,9 +4,11 @@ from .data_ref import \
     DATE_FORMAT, sse_calendar, \
     INDEX_KEY, PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, \
     CLOSE_PRICE_NAME, TOTAL_ROW_KEY, \
-    HV_20_NAME, HV_250_NAME, HV_20_250_NAME, HV_PER, IV_NAME, IV_PER
+    HV_20_NAME, HV_250_NAME, HV_20_250_NAME, HV_PER, IV_NAME, IV_PER, \
+    HV_MAX, HV_MIN, IV_MAX, IV_MIN
 from .utilities_hv import \
-    HV_DISTRIBUTION_PERIODS, historical_volatility, calc_percentage
+    HV_DISTRIBUTION_PERIODS, historical_volatility, \
+    calc_percentage, historical_max_min
 from .data_ref import SYNC_DATA_MODE
 from .logger import logger
 from functools import cached_property
@@ -79,6 +81,7 @@ class FuturesDataManager(DataManager):
         df[HV_250_NAME] = historical_volatility(df[CLOSE_PRICE_NAME], 250)
         df[HV_20_250_NAME] = df[HV_20_NAME] / df[HV_250_NAME]
         df[HV_PER] = calc_percentage(df[HV_20_NAME])
+        historical_max_min(df, HV_20_NAME, HV_MAX, HV_MIN)
         return df
 
     #----------------------------------------------------------------------
@@ -122,6 +125,7 @@ class OptionsDataManager(DataManager):
             else:
                 df_f = df_f.join(o_df, how = 'left')
             df_f[IV_PER] = calc_percentage(df_f[IV_NAME])
+            historical_max_min(df_f, IV_NAME, IV_MAX, IV_MIN)
             joined.append(df_f)
         return joined
 
