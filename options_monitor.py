@@ -80,7 +80,8 @@ class MonitorScheduleManager(ScheduleManager):
 
     def analyze(self, mgrs: list):
         if ANALYZE_WHEN_START is True:
-            map(lambda mgr: mgr[0]._remote_data.recalculate_siv_test(), mgrs)
+            logger.info('recalculate siv for all. ')
+            [mgr._remote_data.recalculate_siv_test() for mgr, _ in mgrs]
         results = map(lambda mgr: mgr[0].analyze(mgr[1]), mgrs)
         all_dfs = []
         for analyze_dfs, _data_all in results:
