@@ -6,6 +6,17 @@
 
 ## 使用方法
 第一次下载数据耗时较长，且可能中途暂停，可能需要多次重新启动服务。
+
+```bash
+# 期权定价模型 cython 版本编译
+pip3 install Cython
+cd ./pricing/cython_model/binomial_tree_cython/
+pip3 install .
+cd ./pricing/cython_model/black_76_cython/
+pip3 install .
+cd ./pricing/cython_model/black_scholes_cython/
+pip3 install .
+```
 ```bash
 pip3 install -r ./requirements.txt
 pip3 install .
@@ -24,8 +35,8 @@ tail ./nohup.out
 #### 0.5.0 历史波动率计算
 #### 0.6.0 历史波动率百分位计算
 #### 0.7.0 根据 hv20 / hv250 的相对百分比排序，并通过 dingding 通知
-### 计划中
 #### 0.8.0 综合隐含波动率计算，综合隐含波动百分位计算
+### 计划中
 
 ## 数据获取方式
 
