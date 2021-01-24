@@ -58,6 +58,7 @@ OPTION_TYPE_NAME = 'otype' # 期权类型 c call p put
 S_PRICE_NAME = 's_price'   # 行权价
 U_PRICE_NAME = 'u_price'   # 标的价
 EXPIRY_NAME = 'expiry'     # 到期日
+TURNOVER_NAME = 'turnover' # 成交金额
 
 
 # hv key

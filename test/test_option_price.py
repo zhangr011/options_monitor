@@ -5,7 +5,8 @@ import unittest as ut
 from options_monitor.data_ref import \
     INDEX_KEY, TOTAL_ROW_KEY, IV_NAME, PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, \
     S_PRICE_NAME, U_PRICE_NAME, CLOSE_PRICE_NAME, VOLUME_NAME
-from options_monitor.remote_data import calculate_iv, calculate_siv
+from options_monitor.remote_data import \
+    calculate_iv, calculate_siv_by_volumes, calculate_siv_by_turnovers
 from options_monitor.utilities_options import \
     calc_iv, fill_the_date, get_expiry_date, oc_mgr, calc_remained_days, \
     OPTIONS_TYPE_CALL, OPTIONS_TYPE_PUT
@@ -39,11 +40,15 @@ class TestOptionPrice(ut.TestCase):
         ivs = df_iv[IV_NAME].tolist()
         self.assertEqual([0.4109, 0.3242, 0.3803, 0.416, 0.1992, 0], ivs)
         # test for iv of 0
-        df = calculate_siv(df)
+        df = calculate_siv_by_volumes(df)
         self.assertEqual(0.298, df.iloc[-1][IV_NAME])
+        df = calculate_siv_by_turnovers(df)
+        self.assertEqual(0.309, df.iloc[-1][IV_NAME])
         df2 = df[df[PRODUCT_ID_NAME] != 'cu2105C30']
-        df2 = calculate_siv(df2)
+        df2 = calculate_siv_by_volumes(df2)
         self.assertEqual(0.298, df2.iloc[-1][IV_NAME])
+        df2 = calculate_siv_by_turnovers(df2)
+        self.assertEqual(0.309, df2.iloc[-1][IV_NAME])
 
 
     #----------------------------------------------------------------------

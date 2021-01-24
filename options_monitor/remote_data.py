@@ -6,7 +6,7 @@ from .data_ref import INDEX_KEY, DATE_FORMAT
 from .data_ref import PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, \
     OPEN_PRICE_NAME, HIGH_PRICE_NAME, LOW_PRICE_NAME, CLOSE_PRICE_NAME, \
     PRE_SETTLE_PRICE_NAME, SETTLE_PRICE_NAME, OPEN_INTEREST_NAME, OI_CHG_NAME, \
-    VOLUME_NAME, TOTAL_ROW_KEY, COLUMN_NAMES
+    VOLUME_NAME, TURNOVER_NAME, TOTAL_ROW_KEY, COLUMN_NAMES
 from .data_ref import IV_NAME, U_PRODUCT_ID_NAME, S_PRICE_NAME, \
     U_PRICE_NAME, OPTION_TYPE_NAME, O_COLUMN_NAMES, EXPIRY_NAME
 from .utilities import load_futures_by_csv
@@ -196,6 +196,12 @@ def calculate_iv(df: pd.DataFrame, total_key: str = TOTAL_ROW_KEY):
 #----------------------------------------------------------------------
 def calculate_siv(df_in: pd.DataFrame, total_key: str = TOTAL_ROW_KEY):
     """"""
+    return calculate_siv_by_turnovers(df_in, total_key)
+
+
+#----------------------------------------------------------------------
+def calculate_siv_by_volumes(df_in: pd.DataFrame, total_key: str = TOTAL_ROW_KEY):
+    """according to [options as strategy]"""
     df = df_in[df_in[PRODUCT_ID_NAME] != TOTAL_ROW_KEY]
     # filter the normal iv
     df = df[df[IV_NAME] > 0.01]
@@ -206,6 +212,30 @@ def calculate_siv(df_in: pd.DataFrame, total_key: str = TOTAL_ROW_KEY):
     totals = df[[PRODUCT_GROUP_NAME, VOLUME_NAME]].groupby([df.index, PRODUCT_GROUP_NAME]).sum()
     df = df.join(totals, how = 'left', on = [df.index, PRODUCT_GROUP_NAME], rsuffix = '_all')
     df['weights'] = df[STRIKE_BIAS_NAME] * df[VOLUME_NAME] / df[VOLUME_NAME + '_all']
+    wm = lambda x: np.average(x[IV_NAME], weights = x['weights'])
+    group = df.groupby([df.index, PRODUCT_GROUP_NAME]).apply(wm)
+    df_in[IV_NAME] = np.where(
+        df_in[PRODUCT_ID_NAME] == total_key,
+        round(group[pd.MultiIndex.from_arrays([df_in.index, df_in[PRODUCT_GROUP_NAME]])], 3),
+        df_in[IV_NAME])
+    return df_in
+
+
+#----------------------------------------------------------------------
+def calculate_siv_by_turnovers(df_in: pd.DataFrame, total_key: str = TOTAL_ROW_KEY):
+    """as by volumes, the options witch are due to expire may cause iv inaccurate. """
+    df = df_in[df_in[PRODUCT_ID_NAME] != TOTAL_ROW_KEY]
+    # filter the normal iv
+    df = df[df[IV_NAME] > 0.01]
+    df[STRIKE_BIAS_NAME] = abs(df[S_PRICE_NAME] - df[U_PRICE_NAME]) / df[U_PRICE_NAME]
+    df[STRIKE_BIAS_NAME] = np.where(df[STRIKE_BIAS_NAME] > OPTION_BIAS_AA,
+                                    0,
+                                    np.square((df[STRIKE_BIAS_NAME] - OPTION_BIAS_AA) / OPTION_BIAS_AA))
+    # use price * volumes as weight
+    df[TURNOVER_NAME] = df[CLOSE_PRICE_NAME] * df[VOLUME_NAME]
+    totals = df[[PRODUCT_GROUP_NAME, VOLUME_NAME, TURNOVER_NAME]].groupby([df.index, PRODUCT_GROUP_NAME]).sum()
+    df = df.join(totals, how = 'left', on = [df.index, PRODUCT_GROUP_NAME], rsuffix = '_all')
+    df['weights'] = df[STRIKE_BIAS_NAME] * df[TURNOVER_NAME] / df[TURNOVER_NAME + '_all']
     wm = lambda x: np.average(x[IV_NAME], weights = x['weights'])
     group = df.groupby([df.index, PRODUCT_GROUP_NAME]).apply(wm)
     df_in[IV_NAME] = np.where(
@@ -341,6 +371,20 @@ class IRemoteHttpData(metaclass = ABCMeta):
         data = data[~data.index.duplicated(keep = 'last')]
         data.to_csv(path_or_buf = self.get_local_path())
         return data
+
+    #----------------------------------------------------------------------
+    def recalculate_iv_test(self):
+        """recalculate the iv"""
+        _li, df = self.get_last_index()
+        df = calculate_iv(df)
+        self.save_data_test(df)
+
+    #----------------------------------------------------------------------
+    def recalculate_siv_test(self):
+        """recalculate the siv"""
+        _li, df = self.get_last_index()
+        df = calculate_siv(df)
+        self.save_data_test(df)
 
     #----------------------------------------------------------------------
     def save_data_test(self, df: pd.DataFrame):

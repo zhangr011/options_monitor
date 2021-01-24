@@ -19,7 +19,8 @@ import threadpool
 
 pd.set_option('mode.chained_assignment', None)
 
-ANALYZE_WHEN_START = False
+ANALYZE_WHEN_START = True
+SEND_MSG           = True
 
 #----------------------------------------------------------------------
 class MonitorScheduleManager(ScheduleManager):
@@ -67,16 +68,24 @@ class MonitorScheduleManager(ScheduleManager):
         [pool2.putRequest(req) for req in requests2]
         pool2.wait()
         logger.info('all options data downloaded. ')
-        cffe_o_dfs, _cffe_o_all = cffe_options_mgr.analyze(csindex300_dfs)
-        shfe_o_dfs, _shfe_o_all = shfe_options_mgr.analyze(shfe_dfs)
-        dce_o_dfs, _dce_o_all = dce_options_mgr.analyze(dce_dfs)
-        czce_o_dfs, _czce_o_all = czce_options_mgr.analyze(czce_dfs)
-        all_dfs = cffe_o_dfs + shfe_o_dfs + dce_o_dfs + czce_o_dfs
+        all_dfs = self.analyze([(cffe_options_mgr, csindex300_dfs),
+                                (shfe_options_mgr, shfe_dfs),
+                                (dce_options_mgr,  dce_dfs),
+                                (czce_options_mgr, czce_dfs)])
         this_date, final_df = sort_hv20250(all_dfs)
         stat_df = mk_notification(final_df)
-        send_html_msg(this_date, stat_df)
+        send_html_msg(this_date, stat_df, SEND_MSG)
         logger.info('schedule task done. ')
         return self.clear_and_return_true()
+
+    def analyze(self, mgrs: list):
+        if ANALYZE_WHEN_START is True:
+            map(lambda mgr: mgr[0]._remote_data.recalculate_siv_test(), mgrs)
+        results = map(lambda mgr: mgr[0].analyze(mgr[1]), mgrs)
+        all_dfs = []
+        for analyze_dfs, _data_all in results:
+            all_dfs += analyze_dfs
+        return all_dfs
 
     def clear_and_return_true(self):
         """clear the _day_index and return True"""

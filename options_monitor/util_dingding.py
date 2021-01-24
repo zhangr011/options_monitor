@@ -86,7 +86,7 @@ def get_http_params(date_str: str):
 
 
 #----------------------------------------------------------------------
-def send_html_msg(date_str: str, df: pd.DataFrame):
+def send_html_msg(date_str: str, df: pd.DataFrame, send: bool = True):
     """将 dataframe 存为 html 之后发送带 html 的链接"""
     link, local_path = get_http_params(date_str)
     df.reset_index(inplace = True)
@@ -95,4 +95,5 @@ def send_html_msg(date_str: str, df: pd.DataFrame):
     msg = {'msgtype': "markdown",
            'markdown': {"title": title,
                         "text": f"#### {title} \n> [for details...]({link}) \n"}}
-    send_msg(msg)
+    if send is True:
+        send_msg(msg)
