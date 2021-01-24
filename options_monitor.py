@@ -19,6 +19,7 @@ import threadpool
 
 pd.set_option('mode.chained_assignment', None)
 
+ANALYZE_WHEN_START = False
 
 #----------------------------------------------------------------------
 class MonitorScheduleManager(ScheduleManager):
@@ -34,7 +35,8 @@ class MonitorScheduleManager(ScheduleManager):
         now_date_str = datetime.now().strftime(DATE_FORMAT)
         if not calendar_manager.check_open(now_date_str):
             logger.info(f'market is closed: {now_date_str}')
-            return self.clear_and_return_true()
+            if ANALYZE_WHEN_START is False:
+                return self.clear_and_return_true()
         # do download data and analyze
         csindex000300_mgr = CSIndex000300DataManager(dates)
         cffe_mgr = CFFEDataManager(dates)
@@ -82,7 +84,7 @@ class MonitorScheduleManager(ScheduleManager):
 
 
 if __name__ == '__main__':
-    mgr = MonitorScheduleManager(False)
+    mgr = MonitorScheduleManager(ANALYZE_WHEN_START)
     logger.info('options monitor started. ')
     while True:
         sleep(1)

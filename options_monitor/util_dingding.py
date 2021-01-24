@@ -89,6 +89,7 @@ def get_http_params(date_str: str):
 def send_html_msg(date_str: str, df: pd.DataFrame):
     """将 dataframe 存为 html 之后发送带 html 的链接"""
     link, local_path = get_http_params(date_str)
+    df.reset_index(inplace = True)
     df.to_html(buf = local_path, bold_rows = False, classes = 'table table-striped', encoding = 'utf_8_sig')
     title = f"daily report: {date_str}"
     msg = {'msgtype': "markdown",
