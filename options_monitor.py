@@ -79,12 +79,15 @@ class MonitorScheduleManager(ScheduleManager):
         this_date, final_df = sort_hv20250(all_dfs)
         stat_df = mk_notification(final_df)
         send_html_msg(this_date, stat_df, self._push_msg)
+        self._push_msg = True
         logger.info('schedule task done. ')
         return self.clear_and_return_true()
 
     def analyze(self, mgrs: list):
         if self._recalculate_siv is True:
             logger.info('recalculate siv for all. ')
+            # only need recalculate siv once
+            self._recalculate_siv = False
             [mgr._remote_data.recalculate_siv_test() for mgr, _ in mgrs]
         results = map(lambda mgr: mgr[0].analyze(mgr[1]), mgrs)
         all_dfs = []

@@ -19,6 +19,12 @@ pd.set_option('mode.chained_assignment', None)
 class TestOptionPrice(ut.TestCase):
 
     #----------------------------------------------------------------------
+    def testIV(self):
+        current = '2021-01-25'
+        iv = oc_mgr.calc_iv('IO2106-P-5600', 320, 5640, current)
+        self.assertEqual(10, iv * 100)
+
+    #----------------------------------------------------------------------
     def testSIV(self):
         """"""
         current = '2020-11-04'

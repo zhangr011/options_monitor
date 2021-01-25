@@ -202,28 +202,18 @@ def calculate_siv(df_in: pd.DataFrame, total_key: str = TOTAL_ROW_KEY):
 #----------------------------------------------------------------------
 def calculate_siv_by_volumes(df_in: pd.DataFrame, total_key: str = TOTAL_ROW_KEY):
     """according to [options as strategy]"""
-    df = df_in[df_in[PRODUCT_ID_NAME] != TOTAL_ROW_KEY]
-    # filter the normal iv
-    df = df[df[IV_NAME] > 0.01]
-    df[STRIKE_BIAS_NAME] = abs(df[S_PRICE_NAME] - df[U_PRICE_NAME]) / df[U_PRICE_NAME]
-    df[STRIKE_BIAS_NAME] = np.where(df[STRIKE_BIAS_NAME] > OPTION_BIAS_AA,
-                                    0,
-                                    np.square((df[STRIKE_BIAS_NAME] - OPTION_BIAS_AA) / OPTION_BIAS_AA))
-    totals = df[[PRODUCT_GROUP_NAME, VOLUME_NAME]].groupby([df.index, PRODUCT_GROUP_NAME]).sum()
-    df = df.join(totals, how = 'left', on = [df.index, PRODUCT_GROUP_NAME], rsuffix = '_all')
-    df['weights'] = df[STRIKE_BIAS_NAME] * df[VOLUME_NAME] / df[VOLUME_NAME + '_all']
-    wm = lambda x: np.average(x[IV_NAME], weights = x['weights'])
-    group = df.groupby([df.index, PRODUCT_GROUP_NAME]).apply(wm)
-    df_in[IV_NAME] = np.where(
-        df_in[PRODUCT_ID_NAME] == total_key,
-        round(group[pd.MultiIndex.from_arrays([df_in.index, df_in[PRODUCT_GROUP_NAME]])], 3),
-        df_in[IV_NAME])
-    return df_in
+    return calculate_siv_by_column(df_in, VOLUME_NAME, total_key)
 
 
 #----------------------------------------------------------------------
 def calculate_siv_by_turnovers(df_in: pd.DataFrame, total_key: str = TOTAL_ROW_KEY):
     """as by volumes, the options witch are due to expire may cause iv inaccurate. """
+    return calculate_siv_by_column(df_in, TURNOVER_NAME, total_key)
+
+
+#----------------------------------------------------------------------
+def calculate_siv_by_column(df_in: pd.DataFrame, column: str, total_key: str = TOTAL_ROW_KEY):
+    """calculate the siv by the column,  maybe VOLUME_NAME or TURNOVER_NAME"""
     df = df_in[df_in[PRODUCT_ID_NAME] != TOTAL_ROW_KEY]
     # filter the normal iv
     df = df[df[IV_NAME] > 0.01]
@@ -231,11 +221,13 @@ def calculate_siv_by_turnovers(df_in: pd.DataFrame, total_key: str = TOTAL_ROW_K
     df[STRIKE_BIAS_NAME] = np.where(df[STRIKE_BIAS_NAME] > OPTION_BIAS_AA,
                                     0,
                                     np.square((df[STRIKE_BIAS_NAME] - OPTION_BIAS_AA) / OPTION_BIAS_AA))
-    # use price * volumes as weight
+    # filter the none zero rows
+    df = df[df[STRIKE_BIAS_NAME] > 0]
+    # use price * volumes as turnovers
     df[TURNOVER_NAME] = df[CLOSE_PRICE_NAME] * df[VOLUME_NAME]
-    totals = df[[PRODUCT_GROUP_NAME, VOLUME_NAME, TURNOVER_NAME]].groupby([df.index, PRODUCT_GROUP_NAME]).sum()
-    df = df.join(totals, how = 'left', on = [df.index, PRODUCT_GROUP_NAME], rsuffix = '_all')
-    df['weights'] = df[STRIKE_BIAS_NAME] * df[TURNOVER_NAME] / df[TURNOVER_NAME + '_all']
+    # totals = df[[PRODUCT_GROUP_NAME, column]].groupby([df.index, PRODUCT_GROUP_NAME]).sum()
+    # df = df.join(totals, how = 'left', on = [df.index, PRODUCT_GROUP_NAME], rsuffix = '_all')
+    df['weights'] = df[STRIKE_BIAS_NAME] * df[column]
     wm = lambda x: np.average(x[IV_NAME], weights = x['weights'])
     group = df.groupby([df.index, PRODUCT_GROUP_NAME]).apply(wm)
     df_in[IV_NAME] = np.where(
