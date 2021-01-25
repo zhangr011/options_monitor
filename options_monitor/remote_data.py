@@ -221,8 +221,6 @@ def calculate_siv_by_column(df_in: pd.DataFrame, column: str, total_key: str = T
     df[STRIKE_BIAS_NAME] = np.where(df[STRIKE_BIAS_NAME] > OPTION_BIAS_AA,
                                     0,
                                     np.square((df[STRIKE_BIAS_NAME] - OPTION_BIAS_AA) / OPTION_BIAS_AA))
-    # filter the none zero rows
-    df = df[df[STRIKE_BIAS_NAME] > 0]
     # use price * volumes as turnovers
     df[TURNOVER_NAME] = df[CLOSE_PRICE_NAME] * df[VOLUME_NAME]
     # totals = df[[PRODUCT_GROUP_NAME, column]].groupby([df.index, PRODUCT_GROUP_NAME]).sum()

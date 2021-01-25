@@ -29,6 +29,7 @@ class MonitorScheduleManager(ScheduleManager):
 
     def __init__(self, immediately: bool = False, push_msg: bool = False, recalculate_siv: bool = False):
         """"""
+        self._immediately = immediately
         self._push_msg = push_msg
         self._recalculate_siv = recalculate_siv
         super(MonitorScheduleManager, self).__init__(immediately)
@@ -37,10 +38,10 @@ class MonitorScheduleManager(ScheduleManager):
         """"""
         logger.info('start schedule task. ')
         dates = get_last_trade_dates()
-        now_date_str = datetime.now().strftime(DATE_FORMAT)
+        now_date_str = dates[-1]
         if not calendar_manager.check_open(now_date_str):
             logger.info(f'market is closed: {now_date_str}')
-            if ANALYZE_WHEN_START is False:
+            if self._immediately is not True:
                 return self.clear_and_return_true()
         # do download data and analyze
         csindex000300_mgr = CSIndex000300DataManager(dates)
@@ -55,11 +56,15 @@ class MonitorScheduleManager(ScheduleManager):
         [pool.putRequest(req) for req in requests]
         pool.wait()
         logger.info('all futures data downloaded. ')
-        csindex300_dfs, csindex300_df_all = csindex000300_mgr.analyze()
-        cffe_dfs, cffe_df_all = cffe_mgr.analyze()
-        shfe_dfs, shfe_df_all = shfe_mgr.analyze()
-        dce_dfs, dce_df_all = dce_mgr.analyze()
-        czce_dfs, czce_df_all = czce_mgr.analyze()
+        res_idx300, csindex300_dfs, csindex300_df_all = csindex000300_mgr.analyze(now_date_str)
+        res_cffe, cffe_dfs, cffe_df_all = cffe_mgr.analyze(now_date_str)
+        res_shfe, shfe_dfs, shfe_df_all = shfe_mgr.analyze(now_date_str)
+        res_dce, dce_dfs, dce_df_all = dce_mgr.analyze(now_date_str)
+        res_czce, czce_dfs, czce_df_all = czce_mgr.analyze(now_date_str)
+        if not all([res_idx300, res_cffe, res_shfe, res_dce, res_czce]):
+            # failed
+            logger.info('futures info fetch failed. ')
+            return False
         # for options
         cffe_options_mgr = CFFEOptionsDataManager(dates, csindex300_df_all)
         shfe_options_mgr = SHFEOptionsDataManager(dates, shfe_df_all)
@@ -75,23 +80,29 @@ class MonitorScheduleManager(ScheduleManager):
         all_dfs = self.analyze([(cffe_options_mgr, csindex300_dfs),
                                 (shfe_options_mgr, shfe_dfs),
                                 (dce_options_mgr,  dce_dfs),
-                                (czce_options_mgr, czce_dfs)])
+                                (czce_options_mgr, czce_dfs)], now_date_str)
+        if all_dfs is False:
+            logger.info('options info fetch failed. ')
+            return False
         this_date, final_df = sort_hv20250(all_dfs)
         stat_df = mk_notification(final_df)
         send_html_msg(this_date, stat_df, self._push_msg)
         self._push_msg = True
+        self._immediately = False
         logger.info('schedule task done. ')
         return self.clear_and_return_true()
 
-    def analyze(self, mgrs: list):
+    def analyze(self, mgrs: list, date_str: str):
         if self._recalculate_siv is True:
             logger.info('recalculate siv for all. ')
             # only need recalculate siv once
             self._recalculate_siv = False
             [mgr._remote_data.recalculate_siv_test() for mgr, _ in mgrs]
-        results = map(lambda mgr: mgr[0].analyze(mgr[1]), mgrs)
+        results = map(lambda mgr: mgr[0].analyze(mgr[1], date_str), mgrs)
         all_dfs = []
-        for analyze_dfs, _data_all in results:
+        for result, analyze_dfs, _data_all in results:
+            if result is False:
+                return False
             all_dfs += analyze_dfs
         return all_dfs
 

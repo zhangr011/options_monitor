@@ -51,10 +51,12 @@ class DataManager():
         logger.info('all data downloaded. ')
 
     #----------------------------------------------------------------------
-    def get_products_dataframe(self):
+    def get_products_dataframe(self, date_str: str = None):
         """get the products' dataframe"""
-        lindex, df = self._remote_data.get_last_index()
-        df = df[df[PRODUCT_ID_NAME] == TOTAL_ROW_KEY]
+        lindex, df_raw = self._remote_data.get_last_index()
+        if date_str and date_str != lindex:
+            return False, None, None
+        df = df_raw[df_raw[PRODUCT_ID_NAME] == TOTAL_ROW_KEY]
         df.reset_index(inplace = True)
         df.drop_duplicates(subset = [INDEX_KEY, PRODUCT_ID_NAME, PRODUCT_GROUP_NAME],
                            keep = 'last', inplace = True)
@@ -63,10 +65,10 @@ class DataManager():
         dfs = []
         for pid in group.groups.keys():
             dfs.append(group.get_group(pid))
-        return dfs, df
+        return True, dfs, df_raw
 
     #----------------------------------------------------------------------
-    def analyze(self):
+    def analyze(self, date_str: str = None):
         """"""
         pass
 
@@ -85,11 +87,13 @@ class FuturesDataManager(DataManager):
         return df
 
     #----------------------------------------------------------------------
-    def analyze(self):
+    def analyze(self, date_str: str = None):
         """analyze the data"""
-        products, df_all = self.get_products_dataframe()
-        dfs = map(lambda df: self.analyze_one_hv(df), products)
-        return list(dfs), df_all
+        result, products, df_all = self.get_products_dataframe(date_str)
+        if result is True:
+            dfs = map(lambda df: self.analyze_one_hv(df), products)
+            return True, list(dfs), df_all
+        return False, None, None
 
 
 #----------------------------------------------------------------------
@@ -130,12 +134,14 @@ class OptionsDataManager(DataManager):
         return joined
 
     #----------------------------------------------------------------------
-    def analyze(self, futures_dfs: list):
+    def analyze(self, futures_dfs: list, date_str: str = None):
         """analyze the data"""
-        options, df_all = self.get_products_dataframe()
-        dfs = self.join_options(futures_dfs, options)
-        # merge the options' data into futures
-        return dfs, df_all
+        result, options, df_all = self.get_products_dataframe(date_str)
+        if result is True:
+            dfs = self.join_options(futures_dfs, options)
+            # merge the options' data into futures
+            return True, dfs, df_all
+        return False, None, None
 
 
 #----------------------------------------------------------------------
@@ -145,10 +151,12 @@ class CSIndex000300DataManager(FuturesDataManager):
     local = 'csindex_000300'
 
     #----------------------------------------------------------------------
-    def get_products_dataframe(self):
+    def get_products_dataframe(self, date_str: str = None):
         """"""
         lindex, df = self._remote_data.get_last_index()
-        return [df], df
+        if date_str and date_str != lindex:
+            return False, None, None
+        return True, [df], df
 
 
 #----------------------------------------------------------------------
