@@ -23,7 +23,11 @@ pip3 install .
 # copy and edit your push.ini if needed.
 cp ./data/push.back.ini ./data/push.ini
 # start the monitor at back
-bash ./start_monitor.sh restart &
+# -m start|restart|stop
+# -i ananlyze immediately
+# -p push message by dingding
+# -r recalculate siv, this maybe called when siv calculation method changed
+bash ./start_monitor.sh -m restart -p 2>1& &
 # check if any error occurred
 tail ./nohup.out
 ```

@@ -16,11 +16,9 @@ from datetime import datetime
 from time import sleep
 import pandas as pd
 import threadpool
+import argparse
 
 pd.set_option('mode.chained_assignment', None)
-
-ANALYZE_WHEN_START = False
-SEND_MSG           = True
 
 #----------------------------------------------------------------------
 class MonitorScheduleManager(ScheduleManager):
@@ -28,6 +26,12 @@ class MonitorScheduleManager(ScheduleManager):
     # UTC+8
     _crontab = f'05 {SCHEDULE_HOUR} * * *'
     pool_size = 10
+
+    def __init__(self, immediately: bool = False, push_msg: bool = False, recalculate_siv: bool = False):
+        """"""
+        self._push_msg = push_msg
+        self._recalculate_siv = recalculate_siv
+        super(MonitorScheduleManager, self).__init__(immediately)
 
     def do_timeout(self):
         """"""
@@ -74,12 +78,12 @@ class MonitorScheduleManager(ScheduleManager):
                                 (czce_options_mgr, czce_dfs)])
         this_date, final_df = sort_hv20250(all_dfs)
         stat_df = mk_notification(final_df)
-        send_html_msg(this_date, stat_df, SEND_MSG)
+        send_html_msg(this_date, stat_df, self._push_msg)
         logger.info('schedule task done. ')
         return self.clear_and_return_true()
 
     def analyze(self, mgrs: list):
-        if ANALYZE_WHEN_START is True:
+        if self._recalculate_siv is True:
             logger.info('recalculate siv for all. ')
             [mgr._remote_data.recalculate_siv_test() for mgr, _ in mgrs]
         results = map(lambda mgr: mgr[0].analyze(mgr[1]), mgrs)
@@ -94,7 +98,17 @@ class MonitorScheduleManager(ScheduleManager):
 
 
 if __name__ == '__main__':
-    mgr = MonitorScheduleManager(ANALYZE_WHEN_START)
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument('--imm', type = bool, dest = 'immediately', default = False,
+                            help = 'immediately analyze when started. ')
+    arg_parser.add_argument('--push', type = bool, dest = 'push_msg', default = False,
+                            help = 'push the message. ')
+    arg_parser.add_argument('--recalculate_siv', type = bool, dest = 'recalculate_siv',
+                            default = False,
+                            help = 'recalculate the siv before analyze, this may be used when siv calculation method changed. ')
+    args = arg_parser.parse_args()
+    # logger.info('', args.immediately, type(args.immediately), args.push_msg, type(args.push_msg), args.recalculate_siv, type(args.recalculate_siv))
+    mgr = MonitorScheduleManager(args.immediately, args.push_msg, args.recalculate_siv)
     logger.info('options monitor started. ')
     while True:
         sleep(1)
