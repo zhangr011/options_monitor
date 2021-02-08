@@ -26,6 +26,7 @@ class MonitorScheduleManager(ScheduleManager):
     # UTC+8
     _crontab = f'05 {SCHEDULE_HOUR} * * *'
     pool_size = 10
+    day_pushed = None
 
     def __init__(self, immediately: bool = False, push_msg: bool = False, recalculate_siv: bool = False):
         """"""
@@ -39,8 +40,11 @@ class MonitorScheduleManager(ScheduleManager):
         logger.info('start schedule task. ')
         dates = get_last_trade_dates()
         now_date_str = dates[-1]
-        if not calendar_manager.check_open(now_date_str):
-            logger.info(f'market is closed: {now_date_str}')
+        if not calendar_manager.check_open(now_date_str) or now_date_str == self.day_pushed:
+            if now_date_str == self.day_pushed:
+                logger.info(f'{now_date_str} info has been pushed. ')
+            else:
+                logger.info(f'market is closed: {now_date_str}')
             if self._immediately is not True:
                 return self.clear_and_return_true()
         # do download data and analyze
@@ -89,7 +93,8 @@ class MonitorScheduleManager(ScheduleManager):
         send_html_msg(this_date, stat_df, self._push_msg)
         self._push_msg = True
         self._immediately = False
-        logger.info('schedule task done. ')
+        self.day_pushed = now_date_str
+        logger.info(f'{now_date_str} schedule task done. ')
         return self.clear_and_return_true()
 
     def analyze(self, mgrs: list, date_str: str):
