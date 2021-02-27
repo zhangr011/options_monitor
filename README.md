@@ -11,7 +11,7 @@ cd 3rd/proxy_pool.git
 sudo apt-get install libxml2-dev libxslt1-dev
 sudo pip install lxml
 pip3 install -r ./requirements.txt
-pip install werkzeug --upgrade
+pip3 install werkzeug --upgrade
 ```
 更新配置
 ```python
@@ -41,11 +41,8 @@ PROXY_FETCHER = [
 # 如果已经具备运行条件, 可用通过proxyPool.py启动。
 # 程序分为: schedule 调度程序 和 server Api服务
 
-# 启动调度程序
-python proxyPool.py schedule
-
-# 启动webApi服务
-python proxyPool.py server
+# 启动调度程序，启动webApi服务
+bash ./start_proxy_pool.sh -m restart
 ```
 
 第一次下载数据耗时较长，且可能中途暂停，可能需要多次重新启动服务。
