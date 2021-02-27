@@ -45,6 +45,16 @@ OPTIONS_NAME_RE = '(\w+\d+)(C|P)(\d+)'
 OPTIONS_NAME_DASH_RE = '(\w+\d+)-(C|P)-(\d+)'
 
 
+def get_proxy():
+    return requests.get("http://127.0.0.1:5010/get/").json()
+
+
+def delete_proxy(proxy):
+    if proxy is None:
+        return
+    requests.get("http://127.0.0.1:5010/delete/?proxy={proxy}")
+
+
 #----------------------------------------------------------------------
 def get_content_json(response):
     return json.loads(response.text)
@@ -241,6 +251,7 @@ class IRemoteHttpData(metaclass = ABCMeta):
     remote_path = ""
     csv_mode = CSV_WRITE_MODE.APPEND
     request_post = False
+    proxy_mode = False
 
     def __init__(self, data_path: str, local: str, dates: pd.Index,
                  df_extra: pd.DataFrame):
@@ -382,20 +393,57 @@ class IRemoteHttpData(metaclass = ABCMeta):
         df.to_csv(path_or_buf = self.get_local_path())
 
     #----------------------------------------------------------------------
-    def do_query_remote(self, date_str: str):
-        """query the remote data"""
+    def do_query_remote_once(self, url: str, data: dict, hds: dict,
+                             proxies: dict, retry_count: int = 0):
+        """query the remote data with 5 retry times"""
+        if retry_count < 0:
+            return False
         try:
             if self.request_post:
-                url, data = self.get_remote_path(date_str)
-                response = requests.post(url, data)
+                response = requests.post(url, data, headers = hds, proxies = proxies)
             else:
-                url = self.get_remote_path(date_str)
-                response = requests.get(url)
-            response.raise_for_status()
-            return response
+                response = requests.get(url, headers = hds, proxies = proxies)
+            if 200 == response.status_code:
+                # get the remote info
+                return response
+            elif 304 == response.status_code:
+                # be banned
+                logger.error(f'http requests 403 error: {url}')
+                return response.status_code
         except Exception as e:
             logger.error(f"http requests failed. {url} {traceback.format_exc(limit = 0)}")
+        return self.do_query_remote_once(url, data, hds, proxies, retry_count - 1)
+
+    #----------------------------------------------------------------------
+    def do_query_remote_once_with_proxy(self, url: str, data: dict, hds: dict,
+                                        proxy: str, proxies: dict, retry_count: int = 0):
+        """with proxies"""
+        if retry_count < 0:
             return False
+        # no proxies at first
+        if isinstance(proxy, str):
+            proxies = {"http": f"http://{proxy}"}
+        else:
+            proxies = {}
+        result = self.do_query_remote_once(url, data, hds, proxies, 5)
+        if 304 == result:
+            delete_proxy(proxy)
+            proxy = get_proxy().get('proxy')
+            # try to use another proxy
+            return self.do_query_remote_once_with_proxy(url, data, hds, proxy, retry_count - 1)
+        else:
+            return result
+
+    #----------------------------------------------------------------------
+    def do_query_remote(self, date_str: str):
+        """query the remote data"""
+        hds = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36'}
+        data = None
+        if self.request_post:
+            url, data = self.get_remote_path(date_str)
+        else:
+            url = self.get_remote_path(date_str)
+        return self.do_query_remote_once_with_proxy(url, data, hds, None, 1000)
 
     #----------------------------------------------------------------------
     def get_underlying_close_price(self, df: pd.DataFrame, date_str: str):
@@ -787,6 +835,7 @@ class RemoteHttpCZCEData(IRemoteHttpData):
 
     # http://www.czce.com.cn/cn/DFSStaticFiles/Future/2021/20210105/FutureDataDaily.htm
     remote_path = "http://www.czce.com.cn/cn/DFSStaticFiles/Future/%s/%s/FutureDataDaily.htm"
+    proxy_mode = True
 
     #----------------------------------------------------------------------
     def get_remote_path(self, date: str):
@@ -830,6 +879,7 @@ class RemoteHttpCZCEOptionsData(RemoteHttpCZCEData):
 
     # http://www.czce.com.cn/cn/DFSStaticFiles/Option/2021/20210105/OptionDataDaily.htm
     remote_path = "http://www.czce.com.cn/cn/DFSStaticFiles/Option/%s/%s/OptionDataDaily.htm"
+    proxy_mode = True
 
     #----------------------------------------------------------------------
     def do_data_handle(self, data, date_str: str):

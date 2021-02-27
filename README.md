@@ -5,6 +5,46 @@
 
 
 ## 使用方法
+由于郑商所使用了反爬，所以需要先安装 proxy_pool
+```bash
+cd 3rd/proxy_pool.git
+pip3 install -r ./requirements.txt
+```
+更新配置
+```python
+# setting.py 为项目配置文件
+
+# 配置API服务
+
+HOST = "0.0.0.0"               # IP
+PORT = 5000                    # 监听端口
+
+
+# 配置数据库
+
+DB_CONN = 'redis://:pwd@127.0.0.1:8888/0'
+
+
+# 配置 ProxyFetcher
+
+PROXY_FETCHER = [
+    "freeProxy01",      # 这里是启用的代理抓取方法名，所有fetch方法位于fetcher/proxyFetcher.py
+    "freeProxy02",
+    # ....
+]
+```
+启动 proxy_pool
+```bash
+# 如果已经具备运行条件, 可用通过proxyPool.py启动。
+# 程序分为: schedule 调度程序 和 server Api服务
+
+# 启动调度程序
+python proxyPool.py schedule
+
+# 启动webApi服务
+python proxyPool.py server
+```
+
 第一次下载数据耗时较长，且可能中途暂停，可能需要多次重新启动服务。
 
 ```bash
@@ -40,6 +80,7 @@ tail ./nohup.out
 #### 0.6.0 历史波动率百分位计算
 #### 0.7.0 根据 hv20 / hv250 的相对百分比排序，并通过 dingding 通知
 #### 0.8.0 综合隐含波动率计算，综合隐含波动百分位计算
+#### 0.9.0 增加反爬虫手段
 ### 计划中
 
 ## 数据获取方式
