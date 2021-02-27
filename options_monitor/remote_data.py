@@ -426,7 +426,7 @@ class IRemoteHttpData(metaclass = ABCMeta):
         else:
             proxies = {}
         result = self.do_query_remote_once(url, data, hds, proxies, 5)
-        if 304 == result:
+        if 304 == result or result is False:
             delete_proxy(proxy)
             proxy = get_proxy().get('proxy')
             # try to use another proxy
