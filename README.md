@@ -8,7 +8,10 @@
 由于郑商所使用了反爬，所以需要先安装 proxy_pool
 ```bash
 cd 3rd/proxy_pool.git
+sudo apt-get install libxml2-dev libxslt1-dev
+sudo pip install lxml
 pip3 install -r ./requirements.txt
+pip install werkzeug --upgrade
 ```
 更新配置
 ```python
