@@ -147,6 +147,8 @@ FUTURE_HV_NAMES = {
     'ZC' : u'动煤'
 }
 
+FUTURE_HV_NAMES_REVERSE = {val : key for key, val in FUTURE_HV_NAMES.items()}
+
 
 #----------------------------------------------------------------------
 def check_date_in(date_str: str, dates: pd.Index):

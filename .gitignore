@@ -3,6 +3,7 @@
 /test/data/VIX.csv
 nohup.out
 options_monitor.pid
+/pyecharts_flask_kline/logs/
 
 __pycache__
 *.pyc

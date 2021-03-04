@@ -12,8 +12,10 @@ from .utilities_hv import \
 from .data_ref import SYNC_DATA_MODE
 from .logger import logger
 from functools import cached_property
+from .singleton import Singleton
 
 import os, datetime
+import threadpool
 import trading_calendars as tcs
 import numpy as np
 import pandas as pd
@@ -39,22 +41,28 @@ class DataManager():
         pass
 
     #----------------------------------------------------------------------
-    def download_raw_data(self, downloaded = False):
+    def init_remote_data(self, force_reset: bool = False):
+        """init the remote data if needed."""
+        if self._remote_data is None or force_reset is True:
+            from .remote_data import remote_data_fac
+            self._remote_data = remote_data_fac.create(
+                self.local, self.data_mode, self._trade_dates, self._df_extra)
+
+    #----------------------------------------------------------------------
+    def download_raw_data(self):
         """download the data"""
-        if downloaded is True:
-            return
+        # force to reset the self._remote_data before download
+        self.init_remote_data(True)
         logger.info(f'start downloading data from {self.data_mode}')
-        from .remote_data import remote_data_fac
-        self._remote_data = remote_data_fac.create(
-            self.local, self.data_mode, self._trade_dates, self._df_extra)
         self._remote_data.sync_data()
         logger.info('all data downloaded. ')
 
     #----------------------------------------------------------------------
     def get_products_dataframe(self, date_str: str = None):
         """get the products' dataframe"""
+        self.init_remote_data()
         lindex, df_raw = self._remote_data.get_last_index()
-        if date_str and date_str != lindex:
+        if date_str and date_str > lindex:
             return False, None, None
         df = df_raw[df_raw[PRODUCT_ID_NAME] == TOTAL_ROW_KEY]
         df.reset_index(inplace = True)
@@ -153,8 +161,9 @@ class CSIndex000300DataManager(FuturesDataManager):
     #----------------------------------------------------------------------
     def get_products_dataframe(self, date_str: str = None):
         """"""
+        self.init_remote_data()
         lindex, df = self._remote_data.get_last_index()
-        if date_str and date_str != lindex:
+        if date_str and date_str > lindex:
             return False, None, None
         return True, [df], df
 
@@ -275,3 +284,73 @@ class CZCEOptionsDataManager(OptionsDataManager):
 
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_CZCE_OPTIONS
     local = 'czce_options'
+
+
+#----------------------------------------------------------------------
+class SIVManager(metaclass = Singleton):
+
+    pool_size = 10
+
+    def prepare(self, dates: pd.DataFrame, now_date_str: str,
+                download: bool = False, recalc_siv: bool = False):
+        """prepare the data"""
+        if dates is None:
+            # reset the download flag
+            download = False
+        # do download data and analyze
+        csindex000300_mgr = CSIndex000300DataManager(dates)
+        cffe_mgr = CFFEDataManager(dates)
+        shfe_mgr = SHFEDataManager(dates)
+        dce_mgr = DCEDataManager(dates)
+        czce_mgr = CZCEDataManager(dates)
+        if download is True:
+            requests = threadpool.makeRequests(
+                lambda x: x.download_raw_data(),
+                [csindex000300_mgr, cffe_mgr, shfe_mgr, dce_mgr, czce_mgr])
+            pool = threadpool.ThreadPool(self.pool_size)
+            [pool.putRequest(req) for req in requests]
+            pool.wait()
+            logger.info('all futures data downloaded. ')
+        res_idx300, csindex300_dfs, csindex300_df_all = csindex000300_mgr.analyze(now_date_str)
+        res_cffe, cffe_dfs, cffe_df_all = cffe_mgr.analyze(now_date_str)
+        res_shfe, shfe_dfs, shfe_df_all = shfe_mgr.analyze(now_date_str)
+        res_dce, dce_dfs, dce_df_all = dce_mgr.analyze(now_date_str)
+        res_czce, czce_dfs, czce_df_all = czce_mgr.analyze(now_date_str)
+        if not all([res_idx300, res_cffe, res_shfe, res_dce, res_czce]):
+            # failed
+            logger.info('futures info fetch failed. ')
+            return False
+        # for options
+        cffe_options_mgr = CFFEOptionsDataManager(dates, csindex300_df_all)
+        shfe_options_mgr = SHFEOptionsDataManager(dates, shfe_df_all)
+        dce_options_mgr = DCEOptionsDataManager(dates, dce_df_all)
+        czce_options_mgr = CZCEOptionsDataManager(dates, czce_df_all)
+        if download is True:
+            requests2 = threadpool.makeRequests(
+                lambda x: x.download_raw_data(),
+                [cffe_options_mgr, shfe_options_mgr, dce_options_mgr, czce_options_mgr])
+            pool2 = threadpool.ThreadPool(self.pool_size)
+            [pool2.putRequest(req) for req in requests2]
+            pool2.wait()
+            logger.info('all options data downloaded. ')
+        all_dfs = self.analyze([(cffe_options_mgr, csindex300_dfs),
+                                (shfe_options_mgr, shfe_dfs),
+                                (dce_options_mgr,  dce_dfs),
+                                (czce_options_mgr, czce_dfs)], now_date_str, recalc_siv)
+        return all_dfs
+
+    #----------------------------------------------------------------------
+    def analyze(self, mgrs: list, date_str: str, recalc_siv: bool):
+        """analyze the options data"""
+        if recalc_siv is True:
+            logger.info('recalculate siv for all. ')
+            # only need recalculate siv once
+            [mgr._remote_data.recalculate_siv_test() for mgr, _ in mgrs]
+        # do analyze
+        results = map(lambda mgr: mgr[0].analyze(mgr[1], date_str), mgrs)
+        all_dfs = []
+        for result, analyze_dfs, _data_all in results:
+            if result is False:
+                return False
+            all_dfs += analyze_dfs
+        return all_dfs

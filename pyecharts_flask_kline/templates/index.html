@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>iv-charts</title>
+        <script src="https://cdn.bootcss.com/jquery/3.0.0/jquery.min.js"></script>
+        <script type="text/javascript" src="https://assets.pyecharts.org/assets/echarts.min.js"></script>
+    </head>
+    <body>
+        <div class="tab">
+            {% for tab_i in tabs %}
+            <a href="/{{tab_i}}/{{date}}" class = "button">{{tab_i}}</a>
+            {% endfor %}
+        </div>
+        <div id="bar" style="width:1000px; height:600px;"></div>
+        <script>
+         $(
+             function () {
+                 var chart = echarts.init(document.getElementById('bar'), 'white', {renderer: 'canvas'});
+                 $.ajax({
+                     type: "GET",
+                     url: "/siv/{{product}}/{{date}}",
+                     dataType: 'json',
+                     success: function (result) {
+                         chart.setOption(result);
+                     }
+                 });
+             }
+         )
+        </script>
+    </body>
+</html>
