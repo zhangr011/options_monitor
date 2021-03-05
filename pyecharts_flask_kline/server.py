@@ -12,7 +12,7 @@ from pyecharts.globals import ThemeType
 from options_monitor.data_manager import SIVManager
 from options_monitor.data_ref import \
     PRODUCT_GROUP_NAME, FUTURE_HV_NAMES_REVERSE, \
-    IV_NAME, VOLUME_NAME, HV_20_NAME, HV_250_NAME, CLOSE_PRICE_NAME
+    IV_NAME, OPEN_INTEREST_NAME, HV_20_NAME, HV_250_NAME, CLOSE_PRICE_NAME, VOLUME_NAME
 
 import pandas as pd
 
@@ -49,7 +49,7 @@ def kline_chart(data: pd.DataFrame, product: str):
     dates = data.index.to_list()
 
     kline = (
-        Kline(init_opts = opts.InitOpts(theme = THEME_ME))
+        Kline(init_opts = opts.InitOpts())
         .add_xaxis(xaxis_data = dates)
         .add_yaxis(
             series_name = "kline",
@@ -106,7 +106,7 @@ def kline_chart(data: pd.DataFrame, product: str):
     )
 
     siv_line = (
-        Line(init_opts = opts.InitOpts(theme = THEME_ME))
+        Line(init_opts = opts.InitOpts())
         .add_xaxis(xaxis_data = dates)
         .add_yaxis(
             series_name = "siv",
@@ -156,18 +156,18 @@ def kline_chart(data: pd.DataFrame, product: str):
         )
     )
 
-    # Bar-1
-    vol = []
+    # options' volume / futures' open interest
+    oi = []
     try:
-        vol = data[VOLUME_NAME]
+        oi = data[OPEN_INTEREST_NAME]
     except KeyError:
         pass
     bar_1 = (
-        Bar(init_opts = opts.InitOpts(theme = THEME_ME))
+        Bar(init_opts = opts.InitOpts())
         .add_xaxis(xaxis_data = data.index)
         .add_yaxis(
-            series_name = "Volumn",
-            y_axis = vol,
+            series_name = "futures oi",
+            y_axis = oi,
             xaxis_index = 1,
             yaxis_index = 1,
             label_opts = opts.LabelOpts(is_show = False),

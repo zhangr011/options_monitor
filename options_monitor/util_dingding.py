@@ -18,6 +18,7 @@ ini_config.read(PUSH_CONFIG_PATH)
 DD_URL = ini_config.get(PUSH_SECTION, 'url')
 DD_TOKEN = ini_config.get(PUSH_SECTION, 'token')
 HTTP_URL = ini_config.get(PUSH_SECTION, 'html_url')
+FLASK_URL = ini_config.get(PUSH_SECTION, 'html_url_flask')
 FILE_PATH = ini_config.get(PUSH_SECTION, 'file_path')
 DD_TOKEN_ENC = DD_TOKEN.encode('utf-8')
 
@@ -81,19 +82,20 @@ def get_http_params(date_str: str):
     """"""
     filename = date_str + '.html'
     link = os.path.join(HTTP_URL, filename)
+    flask_link = os.path.join(FLASK_URL, f'300/{date_str}')
     local_path = os.path.join(FILE_PATH, filename)
-    return link, local_path
+    return link, flask_link, local_path
 
 
 #----------------------------------------------------------------------
 def send_html_msg(date_str: str, df: pd.DataFrame, send: bool = True):
     """将 dataframe 存为 html 之后发送带 html 的链接"""
-    link, local_path = get_http_params(date_str)
+    link, flask_link, local_path = get_http_params(date_str)
     df.reset_index(inplace = True)
     df.to_html(buf = local_path, bold_rows = False, classes = 'table table-striped', encoding = 'utf_8_sig')
     title = f"daily report: {date_str}"
     msg = {'msgtype': "markdown",
            'markdown': {"title": title,
-                        "text": f"#### {title} \n> [for details...]({link}) \n"}}
+                        "text": f"#### {title} \n> [for details...]({link}) \n> [svix viewer...]({flask_link})"}}
     if send is True:
         send_msg(msg)

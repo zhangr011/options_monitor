@@ -1,5 +1,6 @@
 /logs
 /data
+/data_back
 /test/data/VIX.csv
 *.out
 options_monitor.pid
