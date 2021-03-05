@@ -96,6 +96,6 @@ def send_html_msg(date_str: str, df: pd.DataFrame, send: bool = True):
     title = f"daily report: {date_str}"
     msg = {'msgtype': "markdown",
            'markdown': {"title": title,
-                        "text": f"#### {title} \n> [for details...]({link}) \n> [svix viewer...]({flask_link})"}}
+                        "text": f"#### {title} \n> [for details...]({link})  \n  > [svix viewer...]({flask_link}) \n"}}
     if send is True:
         send_msg(msg)
