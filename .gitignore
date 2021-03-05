@@ -4,6 +4,7 @@
 /test/data/VIX.csv
 *.out
 options_monitor.pid
+flask_monitor.pid
 /pyecharts_flask_kline/logs/
 
 __pycache__

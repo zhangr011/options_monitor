@@ -215,4 +215,4 @@ def get_bar_chart(product: str, date_str: str):
 
 
 if __name__ == "__main__":
-    app.run()
+    app.run(host='0.0.0.0')
