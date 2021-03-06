@@ -11,10 +11,14 @@ DATE_FORMAT ='%Y-%m-%d'
 DATE_FORMAT_PATTERN = re.compile(r'(\d{4}-\d{2}-\d{2})')
 
 # data root
-cur_path = os.path.abspath(os.path.dirname(__file__))
-HOME_PATH = os.path.split(cur_path)[0]
-DATA_ROOT = os.path.join(HOME_PATH, 'data')
-TEST_DATA_ROOT = os.path.join(HOME_PATH, 'test/data')
+DATA_ROOT = './data'
+TEST_DATA_ROOT = './test/data'
+
+
+def set_data_root(paths: str):
+    global DATA_ROOT
+    DATA_ROOT = paths
+
 
 # shanghai stock exchange
 sse_calendar = market_cal.get_calendar('SSE')
