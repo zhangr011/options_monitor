@@ -54,7 +54,7 @@ case "$mode" in
         $0 -m start $imm $push $recalc_siv
         ;;
     *)
-        echo "Usage: bash start_monitor.sh [start|stop|restart]"
+        echo "Usage: bash start_monitor.sh -m [start|stop|restart]"
         echo `python3 ./options_monitor.py --help`
         ;;
 esac

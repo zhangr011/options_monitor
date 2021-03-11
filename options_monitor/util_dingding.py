@@ -6,6 +6,7 @@ import requests, threading, traceback, json
 import pandas as pd
 
 from .utilities import DATA_ROOT
+from .data_ref import IV_PER
 from .logger import logger
 
 
@@ -92,10 +93,15 @@ def send_html_msg(date_str: str, df: pd.DataFrame, send: bool = True):
     """将 dataframe 存为 html 之后发送带 html 的链接"""
     link, flask_link, local_path = get_http_params(date_str)
     df.reset_index(inplace = True)
+    df_warn = df[df[IV_PER] != '-']
+    df_warn = df_warn[(df_warn[IV_PER].astype(int) >= 95) | (df_warn[IV_PER].astype(int) <= 15)]
+    warn_msg = ''
+    for index, row in df_warn.iterrows():
+        warn_msg += f"> {row['name']} - {row[IV_PER]}  \n  "
     df.to_html(buf = local_path, bold_rows = False, classes = 'table table-striped', encoding = 'utf_8_sig')
     title = f"daily report: {date_str}"
     msg = {'msgtype': "markdown",
            'markdown': {"title": title,
-                        "text": f"#### {title} \n> [for details...]({link})  \n  > [svix viewer...]({flask_link}) \n"}}
+                        "text": f"#### {title} \n {warn_msg}> [for details...]({link})  \n  > [svix viewer...]({flask_link}) \n"}}
     if send is True:
         send_msg(msg)
