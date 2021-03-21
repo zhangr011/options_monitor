@@ -6,7 +6,7 @@ import requests, threading, traceback, json
 import pandas as pd
 
 from .utilities import DATA_ROOT
-from .data_ref import IV_PER
+from .data_ref import IV_PER, IV_NAME, IV_MIN, IV_MAX
 from .logger import logger
 
 
@@ -93,11 +93,17 @@ def send_html_msg(date_str: str, df: pd.DataFrame, send: bool = True):
     """将 dataframe 存为 html 之后发送带 html 的链接"""
     link, flask_link, local_path = get_http_params(date_str)
     df.reset_index(inplace = True)
+    # ivp check
     df_warn = df[df[IV_PER] != '-']
     df_warn = df_warn[(df_warn[IV_PER].astype(int) >= 95) | (df_warn[IV_PER].astype(int) <= 15)]
+    # iv check
+    df_warn2 = df[(df[IV_PER] == '-') & (df[IV_NAME] != '-')]
+    df_warn2 = df_warn2[(df_warn2[IV_NAME].astype(float) >= df_warn2[IV_MAX].astype(float) * 0.9) |
+                        (df_warn2[IV_NAME].astype(float) <= df_warn2[IV_MIN].astype(float) * 1.1)]
+    df_warn = df_warn.append(df_warn2)
     warn_msg = ''
     for index, row in df_warn.iterrows():
-        warn_msg += f"> {row['name']} - {row[IV_PER]}  \n  "
+        warn_msg += f"> {row['name']}: iv {row[IV_NAME]} p {row[IV_PER]}  \n  "
     df.to_html(buf = local_path, bold_rows = False, classes = 'table table-striped', encoding = 'utf_8_sig')
     title = f"daily report: {date_str}"
     msg = {'msgtype': "markdown",
