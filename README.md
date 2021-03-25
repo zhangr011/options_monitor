@@ -81,7 +81,7 @@ tail ./nohup.out
 #### 0.7.0 根据 hv20 / hv250 的相对百分比排序，并通过 dingding 通知
 #### 0.8.0 综合隐含波动率计算，综合隐含波动百分位计算
 #### 0.9.0 增加反爬虫手段
-#### 0.10.0 增加 siv web 浏览页面，使用 flask 和 pyecharts
+#### 0.10.0 增加 siv web 浏览页面，使用 flask 和 pyecharts （最终转移至 https://github.com/zhangr011/vix_web_viewer.git）
 ### 计划中
 
 ## 数据获取方式
@@ -89,7 +89,7 @@ tail ./nohup.out
 | 各交易所数据获取方式 | |
 |---------------|--------------------------------------------------------------|
 | **中证沪深300指数** | |
-| Request URL | http://www.csindex.com.cn/zh-CN/indices/index-detail/000300?earnings_performance=1%E5%B9%B4&data_type=json |
+| Request URL | http://www.csindex.com.cn/zh-CN/indices/index-detail/000300?earnings_performance=1%E5%B9%B4&data_type=json<br />"http://www.csindex.com.cn/zh-CN/homeApply" 收盘价更新更及时 |
 | 参数 | earnings_performance 设置 3年/3个月 |
 | 返回 | json 格式 |
 | **中金所** | |
