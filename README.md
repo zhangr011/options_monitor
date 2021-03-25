@@ -81,7 +81,7 @@ tail ./nohup.out
 #### 0.7.0 根据 hv20 / hv250 的相对百分比排序，并通过 dingding 通知
 #### 0.8.0 综合隐含波动率计算，综合隐含波动百分位计算
 #### 0.9.0 增加反爬虫手段
-#### 0.10.0 增加 siv web 浏览页面，使用 flask 和 pyecharts （最终转移至 https://github.com/zhangr011/vix_web_viewer.git）
+#### 0.10.0 增加 siv web 浏览页面，使用 flask 和 pyecharts （最终转移至 https://github.com/zhangr011/vix_web_viewer ）
 ### 计划中
 
 ## 数据获取方式
