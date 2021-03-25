@@ -41,6 +41,7 @@ class SYNC_DATA_MODE(Enum):
     HTTP_DOWNLOAD_CZCE_OPTIONS  = 42
     # 沪深 300 指数
     HTTP_DOWNLOAD_CSINDEX_000300 = 51
+    HTTP_DOWNLOAD_CSINDEX_000300_DAILY = 52
 
 
 # index key for file check

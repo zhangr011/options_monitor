@@ -515,6 +515,40 @@ class RemoteHttpCSIndex000300Data(IRemoteHttpData):
 
 
 #----------------------------------------------------------------------
+class RemoteHttpCSIndex000300DailyData(IRemoteHttpData):
+
+    remote_path = "http://www.csindex.com.cn/zh-CN/homeApply"
+    csv_mode = CSV_WRITE_MODE.MERGE
+
+    #----------------------------------------------------------------------
+    def do_sync_data(self, request_dates: pd.Index, ldf: pd.DataFrame):
+        """do sync data at one time"""
+        return self.do_sync_data_one_by_one(request_dates, ldf)
+
+    #----------------------------------------------------------------------
+    def get_remote_path(self, dates: pd.Index):
+        """quety the remote data"""
+        return self.remote_path
+
+    #----------------------------------------------------------------------
+    def do_data_handle(self, data, date_str: str):
+        """"""
+        soup_info = get_content_soup(data)
+        items = soup_info.find_all(class_ = 'item')
+        for item in items:
+            if item.find(class_ = 'g_name').text.strip() == u'沪深300':
+                update_time = item.find(class_ = 'time').text.split(u'：')[1]
+                [update_date, update_hours] = update_time.split()
+                if update_date == date_str and update_hours > '15:01:00':
+                    close_price = item.find(class_ = 'g_num').text
+                    df = pd.DataFrame.from_dict({INDEX_KEY: [update_date],
+                                                 PRODUCT_GROUP_NAME: ['csidx300'],
+                                                 CLOSE_PRICE_NAME: [close_price]})
+                    df.set_index([INDEX_KEY], inplace = True)
+                    return df
+
+
+#----------------------------------------------------------------------
 class RemoteHttpCFFETradingCalendar(IRemoteHttpData):
 
     # http://www.cffex.com.cn/sj/jyrl/202011/index_6782.xml
@@ -946,6 +980,8 @@ class RemoteDataFactory(metaclass = Singleton):
         data_class = None
         if SYNC_DATA_MODE.HTTP_DOWNLOAD_CSINDEX_000300 == via:
             data_class = RemoteHttpCSIndex000300Data
+        elif SYNC_DATA_MODE.HTTP_DOWNLOAD_CSINDEX_000300_DAILY == via:
+            data_class = RemoteHttpCSIndex000300DailyData
         elif SYNC_DATA_MODE.HTTP_DOWNLOAD_CFFE == via:
             data_class = RemoteHttpCFFEData
         elif SYNC_DATA_MODE.HTTP_DOWNLOAD_CFFE_CALENDAR == via:

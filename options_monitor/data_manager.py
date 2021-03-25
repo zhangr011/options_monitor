@@ -14,7 +14,7 @@ from .logger import logger
 from functools import cached_property
 from .singleton import Singleton
 
-import os, datetime
+import os, datetime, time
 import threadpool
 import trading_calendars as tcs
 import numpy as np
@@ -156,7 +156,29 @@ class OptionsDataManager(DataManager):
 class CSIndex000300DataManager(FuturesDataManager):
 
     data_mode = SYNC_DATA_MODE.HTTP_DOWNLOAD_CSINDEX_000300
+    data_mode2 = SYNC_DATA_MODE.HTTP_DOWNLOAD_CSINDEX_000300_DAILY
     local = 'csindex_000300'
+
+    #----------------------------------------------------------------------
+    def init_remote_data(self, force_reset: bool = False):
+        """init the remote data if needed."""
+        if self._remote_data is None or self._remote_data2 is None or \
+           force_reset is True:
+            from .remote_data import remote_data_fac
+            self._remote_data = remote_data_fac.create(
+                self.local, self.data_mode, self._trade_dates, self._df_extra)
+            self._remote_data2 = remote_data_fac.create(
+                self.local, self.data_mode2, self._trade_dates, self._df_extra)
+
+    #----------------------------------------------------------------------
+    def download_raw_data(self):
+        """download the data"""
+        # force to reset the self._remote_data before download
+        super(CSIndex000300DataManager, self).download_raw_data()
+        time.sleep(0.5)
+        logger.info(f'start downloading data from {self.data_mode2}')
+        self._remote_data2.sync_data()
+        logger.info(f'{self.data_mode2} all data downloaded. ')
 
     #----------------------------------------------------------------------
     def get_products_dataframe(self, date_str: str = None):
