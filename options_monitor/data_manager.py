@@ -55,7 +55,7 @@ class DataManager():
         self.init_remote_data(True)
         logger.info(f'start downloading data from {self.data_mode}')
         self._remote_data.sync_data()
-        logger.info('all data downloaded. ')
+        logger.info(f'{self.data_mode} all data downloaded. ')
 
     #----------------------------------------------------------------------
     def get_products_dataframe(self, date_str: str = None):
