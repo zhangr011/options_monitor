@@ -430,6 +430,7 @@ class IRemoteHttpData(metaclass = ABCMeta):
             delete_proxy(proxy)
             proxy = get_proxy().get('proxy')
             # try to use another proxy
+            logger.info(f'get result: {result}, try to use another proxy: {proxy}')
             return self.do_query_remote_once_with_proxy(url, data, hds, proxy, retry_count - 1)
         else:
             return result
