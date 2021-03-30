@@ -496,7 +496,7 @@ class IRemoteHttpData(metaclass = ABCMeta):
     #----------------------------------------------------------------------
     def do_query_remote(self, date_str: str):
         """query the remote data"""
-        hds = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36'},
+        hds = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36'}
         data = None
         if self.request_post:
             url, data = self.get_remote_path(date_str)
