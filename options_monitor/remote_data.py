@@ -16,6 +16,14 @@ from .soup_to_pandas_dataframe import soup_to_pandas_dataframe
 from .singleton import Singleton
 from .logger import logger
 
+from selenium import webdriver
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
+import selenium.webdriver.support.ui as ui
+from requests.models import Response
+
 from abc import abstractclassmethod, ABCMeta
 from enum import Enum
 import os, re, json, traceback, urllib, urllib3, requests, http, time
@@ -45,14 +53,33 @@ OPTIONS_NAME_RE = '(\w+\d+)(C|P)(\d+)'
 OPTIONS_NAME_DASH_RE = '(\w+\d+)-(C|P)-(\d+)'
 
 
+PROXY_STATUS = [304, 504]
+
+
+#----------------------------------------------------------------------
 def get_proxy():
     return requests.get("http://127.0.0.1:5010/get/").json()
 
 
+#----------------------------------------------------------------------
 def delete_proxy(proxy):
     if proxy is None:
         return
     requests.get("http://127.0.0.1:5010/delete/?proxy={proxy}")
+
+
+#----------------------------------------------------------------------
+def get_request_proxies(proxy):
+    if isinstance(proxy, str):
+        return {"http": f"http://{proxy}"}
+    else:
+        return {}
+
+
+#----------------------------------------------------------------------
+def get_selenium_proxies(proxy):
+    if isinstance(proxy, str):
+        return f'<{proxy}>'
 
 
 #----------------------------------------------------------------------
@@ -76,6 +103,15 @@ def get_table_soup(response, encoding: str = None, thead_tbody: bool = True):
 def get_content_xml(response, columns: list, row_name: str):
     df = xml_to_pandas_dataframe(response.text, columns, row_name)
     return df
+
+
+#----------------------------------------------------------------------
+def is_visible(browser, locator, timeout = 30):
+    try:
+        ui.WebDriverWait(browser, timeout).until(EC.visibility_of_element_located((By.XPATH, locator)))
+        return True
+    except TimeoutException:
+        return False
 
 
 #----------------------------------------------------------------------
@@ -251,7 +287,7 @@ class IRemoteHttpData(metaclass = ABCMeta):
     remote_path = ""
     csv_mode = CSV_WRITE_MODE.APPEND
     request_post = False
-    proxy_mode = False
+    selenium_mode = False
 
     def __init__(self, data_path: str, local: str, dates: pd.Index,
                  df_extra: pd.DataFrame):
@@ -394,21 +430,44 @@ class IRemoteHttpData(metaclass = ABCMeta):
 
     #----------------------------------------------------------------------
     def do_query_remote_once(self, url: str, data: dict, hds: dict,
-                             proxies: dict, retry_count: int = 0):
+                             proxy: str, retry_count: int = 0):
         """query the remote data with 5 retry times"""
         if retry_count < 0:
             return False
         try:
-            if self.request_post:
+            if self.selenium_mode:
+                options = webdriver.FirefoxOptions()
+                options.add_argument("--headless")
+                options.add_argument("--disable-gpu")
+                # PROXY = "<HOST:PORT>"
+                proxies = get_selenium_proxies(proxy)
+                with webdriver.Firefox(options = options) as driver:
+                    if proxies:
+                        webdriver.DesiredCapabilities.FIREFOX['proxy'] = {
+                            "httpProxy": proxies,
+                            "ftpProxy": proxies,
+                            "sslProxy": proxies,
+                            "proxyType": "MANUAL",
+                        }
+                    driver.get(url)
+                    is_visible(driver, '/html/body/div[2]/div[2]/div[1]')
+                    # TODO: get the http status
+                    html = driver.page_source
+                    response = Response()
+                    response.status_code = 200
+                    response._content = html
+            elif self.request_post:
+                proxies = get_request_proxies(proxy)
                 response = requests.post(url, data, headers = hds, proxies = proxies)
             else:
+                proxies = get_request_proxies(proxy)
                 response = requests.get(url, headers = hds, proxies = proxies)
             if 200 == response.status_code:
                 # get the remote info
                 return response
-            elif 304 == response.status_code:
+            elif response.status_code in PROXY_STATUS:
                 # be banned
-                logger.error(f'http requests 403 error: {url}')
+                logger.error(f'http requests {response.status_code} error: {url}')
                 return response.status_code
         except Exception as e:
             logger.error(f"http requests failed. {url} {traceback.format_exc(limit = 0)}")
@@ -421,16 +480,15 @@ class IRemoteHttpData(metaclass = ABCMeta):
         if retry_count < 0:
             return False
         # no proxies at first
-        if isinstance(proxy, str):
-            proxies = {"http": f"http://{proxy}"}
-        else:
-            proxies = {}
-        result = self.do_query_remote_once(url, data, hds, proxies, 5)
-        if 304 == result or result is False:
+        result = self.do_query_remote_once(url, data, hds, proxy, 3)
+        if False == result:
+            logger.info(f'get {url} failed, retry times left {retry_count - 1}')
+            return self.do_query_remote_once(url, data, hds, proxy, retry_count - 1)
+        elif result in PROXY_STATUS:
             delete_proxy(proxy)
             proxy = get_proxy().get('proxy')
             # try to use another proxy
-            logger.info(f'get result: {result}, try to use another proxy: {proxy}')
+            logger.info(f'get {url} result: {result}, try to use another proxy: {proxy}')
             return self.do_query_remote_once_with_proxy(url, data, hds, proxy, retry_count - 1)
         else:
             return result
@@ -438,13 +496,13 @@ class IRemoteHttpData(metaclass = ABCMeta):
     #----------------------------------------------------------------------
     def do_query_remote(self, date_str: str):
         """query the remote data"""
-        hds = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36'}
+        hds = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36'},
         data = None
         if self.request_post:
             url, data = self.get_remote_path(date_str)
         else:
             url = self.get_remote_path(date_str)
-        return self.do_query_remote_once_with_proxy(url, data, hds, None, 1000)
+        return self.do_query_remote_once_with_proxy(url, data, hds, None, 3)
 
     #----------------------------------------------------------------------
     def get_underlying_close_price(self, df: pd.DataFrame, date_str: str):
@@ -870,7 +928,7 @@ class RemoteHttpCZCEData(IRemoteHttpData):
 
     # http://www.czce.com.cn/cn/DFSStaticFiles/Future/2021/20210105/FutureDataDaily.htm
     remote_path = "http://www.czce.com.cn/cn/DFSStaticFiles/Future/%s/%s/FutureDataDaily.htm"
-    proxy_mode = True
+    selenium_mode = True
 
     #----------------------------------------------------------------------
     def get_remote_path(self, date: str):
@@ -914,7 +972,7 @@ class RemoteHttpCZCEOptionsData(RemoteHttpCZCEData):
 
     # http://www.czce.com.cn/cn/DFSStaticFiles/Option/2021/20210105/OptionDataDaily.htm
     remote_path = "http://www.czce.com.cn/cn/DFSStaticFiles/Option/%s/%s/OptionDataDaily.htm"
-    proxy_mode = True
+    selenium_mode = True
 
     #----------------------------------------------------------------------
     def do_data_handle(self, data, date_str: str):
