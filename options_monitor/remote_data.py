@@ -28,6 +28,7 @@ from requests.cookies import RequestsCookieJar
 from abc import abstractclassmethod, ABCMeta
 from enum import Enum
 import os, re, json, traceback, urllib, urllib3, requests, http, time
+from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 import pandas as pd
@@ -113,6 +114,37 @@ def is_visible(browser, locator, timeout = 30):
         return True
     except TimeoutException:
         return False
+
+
+#----------------------------------------------------------------------
+def get_url_home(url: str):
+    res = urlparse(url)
+    return res.scheme + '://' + res.netloc
+
+
+#----------------------------------------------------------------------
+def selenium_request(url: str, proxies: dict):
+    options = webdriver.FirefoxOptions()
+    options.add_argument("--headless")
+    options.add_argument("--disable-gpu")
+    # PROXY = "<HOST:PORT>"
+    if proxies:
+        webdriver.DesiredCapabilities.FIREFOX['proxy'] = {
+            "httpProxy": proxies,
+            "ftpProxy": proxies,
+            "sslProxy": proxies,
+            "proxyType": "MANUAL",
+        }
+    # get the requests
+    with webdriver.Firefox(options = options) as driver:
+        driver.get(url)
+        is_visible(driver, '/html/body/div[2]/div[2]/div[1]')
+        # TODO: get the http status
+        html = driver.page_source
+        response = Response()
+        response.status_code = 200
+        response._content = html
+        return driver.get_cookies(), response
 
 
 #----------------------------------------------------------------------
@@ -295,25 +327,6 @@ def import_jquery(driver):
 
 
 #----------------------------------------------------------------------
-def selenium_send_request(driver, url, hds, params, post: bool = False):
-    if not post:
-        parm_list = []
-        for key, value in params.items():
-            parm_list.append(f'{key}={value}')
-            # get the url with params
-        return driver.get(url + '?' + '&'.join(parm_list))
-    else:
-        # TODO: not work yet...
-        import_jquery(driver)
-        ajax_query = '''$.ajax('%s', {type: 'POST', async : false, data: %s, headers: %s, crossDomain: true,
-xhrFields: {
-    withCredentials: true
-}, success: function(){}});''' % (url, hds, params)
-        ajax_query = ajax_query.replace(" ", "").replace("\n", "")
-        resp = driver.execute_script("return " + ajax_query)
-
-
-#----------------------------------------------------------------------
 class IRemoteHttpData(metaclass = ABCMeta):
 
     remote_path = ""
@@ -469,48 +482,14 @@ class IRemoteHttpData(metaclass = ABCMeta):
             return False
         try:
             if self.selenium_mode:
-                options = webdriver.FirefoxOptions()
-                options.add_argument("--headless")
-                options.add_argument("--disable-gpu")
-                # PROXY = "<HOST:PORT>"
-                proxies = get_selenium_proxies(proxy)
-                with webdriver.Firefox(options = options) as driver:
-                    if proxies:
-                        webdriver.DesiredCapabilities.FIREFOX['proxy'] = {
-                            "httpProxy": proxies,
-                            "ftpProxy": proxies,
-                            "sslProxy": proxies,
-                            "proxyType": "MANUAL",
-                        }
-                    driver.get(url)
-                    is_visible(driver, '/html/body/div[2]/div[2]/div[1]')
-                    # TODO: get the http status
-                    html = driver.page_source
-                    response = Response()
-                    response.status_code = 200
-                    response._content = html
+                proxies = get_request_proxies(proxy)
+                cookies, response = selenium_request(url, proxies)
             elif self.request_post:
                 # get the headers by selenium
-                options = webdriver.FirefoxOptions()
-                options.add_argument("--headless")
-                options.add_argument("--disable-gpu")
-                # PROXY = "<HOST:PORT>"
-                proxies = get_selenium_proxies(proxy)
-                cookies = None
-                with webdriver.Firefox(options = options) as driver:
-                    if proxies:
-                        webdriver.DesiredCapabilities.FIREFOX['proxy'] = {
-                            "httpProxy": proxies,
-                            "ftpProxy": proxies,
-                            "sslProxy": proxies,
-                            "proxyType": "MANUAL",
-                        }
-                    # get home url
-                    driver.get('http://www.dce.com.cn/')
-                    driver.implicitly_wait(5)
-                    cookies = driver.get_cookies()
-                # then use the cookies to request
+                home_url = get_url_home(url)
                 proxies = get_request_proxies(proxy)
+                cookies, res = selenium_request(home_url, proxies)
+                # then use the cookies to request
                 cookies_jar = RequestsCookieJar()
                 for cookie in cookies:
                     cookies_jar.set(cookie['name'], cookie['value'])
@@ -519,6 +498,7 @@ class IRemoteHttpData(metaclass = ABCMeta):
             else:
                 proxies = get_request_proxies(proxy)
                 response = requests.get(url, headers = self.request_headers, proxies = proxies)
+            # handle the result
             if 200 == response.status_code:
                 # get the remote info
                 return response
@@ -526,7 +506,7 @@ class IRemoteHttpData(metaclass = ABCMeta):
                 # be banned
                 logger.error(f'http requests {response.status_code} error: {url}')
                 return response.status_code
-        except TimeoutException as e:
+        except Exception as e:
             logger.error(f"http requests failed. {url} {traceback.format_exc(limit = 0)}")
         return self.do_query_remote_once(url, data, proxies, retry_count - 1)
 
