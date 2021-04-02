@@ -15,7 +15,6 @@ from functools import cached_property
 from .singleton import Singleton
 
 import os, datetime, time
-import threadpool
 import trading_calendars as tcs
 import numpy as np
 import pandas as pd
@@ -326,12 +325,11 @@ class SIVManager(metaclass = Singleton):
         dce_mgr = DCEDataManager(dates)
         czce_mgr = CZCEDataManager(dates)
         if download is True:
-            requests = threadpool.makeRequests(
-                lambda x: x.download_raw_data(),
-                [csindex000300_mgr, cffe_mgr, shfe_mgr, dce_mgr, czce_mgr])
-            pool = threadpool.ThreadPool(self.pool_size)
-            [pool.putRequest(req) for req in requests]
-            pool.wait()
+            csindex000300_mgr.download_raw_data()
+            cffe_mgr.download_raw_data()
+            shfe_mgr.download_raw_data()
+            dce_mgr.download_raw_data()
+            czce_mgr.download_raw_data()
             logger.info('all futures data downloaded. ')
         res_idx300, csindex300_dfs, csindex300_df_all = csindex000300_mgr.analyze(now_date_str)
         res_cffe, cffe_dfs, cffe_df_all = cffe_mgr.analyze(now_date_str)
@@ -348,12 +346,10 @@ class SIVManager(metaclass = Singleton):
         dce_options_mgr = DCEOptionsDataManager(dates, dce_df_all)
         czce_options_mgr = CZCEOptionsDataManager(dates, czce_df_all)
         if download is True:
-            requests2 = threadpool.makeRequests(
-                lambda x: x.download_raw_data(),
-                [cffe_options_mgr, shfe_options_mgr, dce_options_mgr, czce_options_mgr])
-            pool2 = threadpool.ThreadPool(self.pool_size)
-            [pool2.putRequest(req) for req in requests2]
-            pool2.wait()
+            cffe_options_mgr.download_raw_data()
+            shfe_options_mgr.download_raw_data()
+            dce_options_mgr.download_raw_data()
+            czce_options_mgr.download_raw_data()
             logger.info('all options data downloaded. ')
         all_dfs = self.analyze([(cffe_options_mgr, csindex300_dfs),
                                 (shfe_options_mgr, shfe_dfs),
