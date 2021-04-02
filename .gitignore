@@ -6,6 +6,7 @@
 options_monitor.pid
 flask_monitor.pid
 /pyecharts_flask_kline/logs/
+geckodriver.log
 
 __pycache__
 *.pyc

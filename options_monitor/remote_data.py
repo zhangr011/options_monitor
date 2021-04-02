@@ -20,9 +20,10 @@ from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, JavascriptException
 import selenium.webdriver.support.ui as ui
 from requests.models import Response
+from requests.cookies import RequestsCookieJar
 
 from abc import abstractclassmethod, ABCMeta
 from enum import Enum
@@ -282,12 +283,44 @@ def calculate_siv_by_column(df_in: pd.DataFrame, column: str, total_key: str = T
 
 
 #----------------------------------------------------------------------
+def import_jquery(driver):
+    """通过执行jquery语句来判断当前网站是否具有jquery环境"""
+    try:  # 执行一段jquery测试代码
+        driver.execute_script("$('body').text()")
+    except JavascriptException:  # 报错说明没有接入jquery环境，执行接入
+        # 请求jquery线上源码包
+        resp = requests.get(r'https://cdn.bootcdn.net/ajax/libs/jquery/3.5.1/jquery.min.js')
+        # 直接执行jquery源码
+        driver.execute_script(resp.content.decode())
+
+
+#----------------------------------------------------------------------
+def selenium_send_request(driver, url, hds, params, post: bool = False):
+    if not post:
+        parm_list = []
+        for key, value in params.items():
+            parm_list.append(f'{key}={value}')
+            # get the url with params
+        return driver.get(url + '?' + '&'.join(parm_list))
+    else:
+        # TODO: not work yet...
+        import_jquery(driver)
+        ajax_query = '''$.ajax('%s', {type: 'POST', async : false, data: %s, headers: %s, crossDomain: true,
+xhrFields: {
+    withCredentials: true
+}, success: function(){}});''' % (url, hds, params)
+        ajax_query = ajax_query.replace(" ", "").replace("\n", "")
+        resp = driver.execute_script("return " + ajax_query)
+
+
+#----------------------------------------------------------------------
 class IRemoteHttpData(metaclass = ABCMeta):
 
     remote_path = ""
     csv_mode = CSV_WRITE_MODE.APPEND
     request_post = False
     selenium_mode = False
+    request_headers = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36'}
 
     def __init__(self, data_path: str, local: str, dates: pd.Index,
                  df_extra: pd.DataFrame):
@@ -429,7 +462,7 @@ class IRemoteHttpData(metaclass = ABCMeta):
         df.to_csv(path_or_buf = self.get_local_path())
 
     #----------------------------------------------------------------------
-    def do_query_remote_once(self, url: str, data: dict, hds: dict,
+    def do_query_remote_once(self, url: str, data: dict,
                              proxy: str, retry_count: int = 0):
         """query the remote data with 5 retry times"""
         if retry_count < 0:
@@ -457,11 +490,35 @@ class IRemoteHttpData(metaclass = ABCMeta):
                     response.status_code = 200
                     response._content = html
             elif self.request_post:
+                # get the headers by selenium
+                options = webdriver.FirefoxOptions()
+                options.add_argument("--headless")
+                options.add_argument("--disable-gpu")
+                # PROXY = "<HOST:PORT>"
+                proxies = get_selenium_proxies(proxy)
+                cookies = None
+                with webdriver.Firefox(options = options) as driver:
+                    if proxies:
+                        webdriver.DesiredCapabilities.FIREFOX['proxy'] = {
+                            "httpProxy": proxies,
+                            "ftpProxy": proxies,
+                            "sslProxy": proxies,
+                            "proxyType": "MANUAL",
+                        }
+                    # get home url
+                    driver.get('http://www.dce.com.cn/')
+                    driver.implicitly_wait(5)
+                    cookies = driver.get_cookies()
+                # then use the cookies to request
                 proxies = get_request_proxies(proxy)
-                response = requests.post(url, data, headers = hds, proxies = proxies)
+                cookies_jar = RequestsCookieJar()
+                for cookie in cookies:
+                    cookies_jar.set(cookie['name'], cookie['value'])
+                rs = requests.session()
+                response = rs.post(url, data, headers = self.request_headers, cookies = cookies_jar, proxies = proxies)
             else:
                 proxies = get_request_proxies(proxy)
-                response = requests.get(url, headers = hds, proxies = proxies)
+                response = requests.get(url, headers = self.request_headers, proxies = proxies)
             if 200 == response.status_code:
                 # get the remote info
                 return response
@@ -469,40 +526,39 @@ class IRemoteHttpData(metaclass = ABCMeta):
                 # be banned
                 logger.error(f'http requests {response.status_code} error: {url}')
                 return response.status_code
-        except Exception as e:
+        except TimeoutException as e:
             logger.error(f"http requests failed. {url} {traceback.format_exc(limit = 0)}")
-        return self.do_query_remote_once(url, data, hds, proxies, retry_count - 1)
+        return self.do_query_remote_once(url, data, proxies, retry_count - 1)
 
     #----------------------------------------------------------------------
-    def do_query_remote_once_with_proxy(self, url: str, data: dict, hds: dict,
+    def do_query_remote_once_with_proxy(self, url: str, data: dict,
                                         proxy: str, proxies: dict, retry_count: int = 0):
         """with proxies"""
         if retry_count < 0:
             return False
         # no proxies at first
-        result = self.do_query_remote_once(url, data, hds, proxy, 3)
+        result = self.do_query_remote_once(url, data, proxy, 3)
         if False == result:
             logger.info(f'get {url} failed, retry times left {retry_count - 1}')
-            return self.do_query_remote_once(url, data, hds, proxy, retry_count - 1)
+            return self.do_query_remote_once(url, data, proxy, retry_count - 1)
         elif result in PROXY_STATUS:
             delete_proxy(proxy)
             proxy = get_proxy().get('proxy')
             # try to use another proxy
             logger.info(f'get {url} result: {result}, try to use another proxy: {proxy}')
-            return self.do_query_remote_once_with_proxy(url, data, hds, proxy, retry_count - 1)
+            return self.do_query_remote_once_with_proxy(url, data, proxy, retry_count - 1)
         else:
             return result
 
     #----------------------------------------------------------------------
     def do_query_remote(self, date_str: str):
         """query the remote data"""
-        hds = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36'}
         data = None
         if self.request_post:
             url, data = self.get_remote_path(date_str)
         else:
             url = self.get_remote_path(date_str)
-        return self.do_query_remote_once_with_proxy(url, data, hds, None, 3)
+        return self.do_query_remote_once_with_proxy(url, data, None, 3)
 
     #----------------------------------------------------------------------
     def get_underlying_close_price(self, df: pd.DataFrame, date_str: str):
@@ -807,6 +863,14 @@ class RemoteHttpDCEData(IRemoteHttpData):
     # http://www.dce.com.cn/publicweb/quotesdata/dayQuotesCh.html
     remote_path = "http://www.dce.com.cn/publicweb/quotesdata/dayQuotesCh.html"
     request_post = True
+    request_headers = {'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+                       'Accept-Encoding': 'gzip, deflate',
+                       'Accept-Language': 'en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7',
+                       'Connection': 'keep-alive',
+                       'Host': 'www.dce.com.cn',
+                       'Referer': 'http://www.dce.com.cn/',
+                       'Upgrade-Insecure-Requests': '1',
+                       'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36'}
     # for futures
     trade_type = '0'
     instruments_map = {
