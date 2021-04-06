@@ -363,7 +363,7 @@ class SIVManager(metaclass = Singleton):
         if recalc_siv is True:
             logger.info('recalculate siv for all. ')
             # only need recalculate siv once
-            [mgr._remote_data.recalculate_siv_test() for mgr, _ in mgrs]
+            [mgr._remote_data.recalculate_siv_test(True) for mgr, _ in mgrs]
         # do analyze
         results = map(lambda mgr: mgr[0].analyze(mgr[1], date_str), mgrs)
         all_dfs = []

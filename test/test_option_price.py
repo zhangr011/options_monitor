@@ -22,7 +22,7 @@ class TestOptionPrice(ut.TestCase):
     def testIV(self):
         current = '2021-01-25'
         iv = oc_mgr.calc_iv('IO2106-P-5600', 320, 5640, current)
-        self.assertEqual(10, iv * 100)
+        self.assertEqual(24.52, iv * 100)
 
     #----------------------------------------------------------------------
     def testSIV(self):
@@ -181,6 +181,8 @@ class TestOptionPrice(ut.TestCase):
         self.assertAlmostEqual(18.56, ivc * 100, delta = 0.51) # too much
         ivp = oc_mgr.calc_iv('SR103P5300', 127.5, 5216, current)
         self.assertAlmostEqual(21.02, ivp * 100, delta = 1.4) # too too too much
+        days = calc_remained_days('ZC', '2021-05-01', '2021-04-06')
+        self.assertEqual(1, days)
 
 
     def testOptionPrice2(self):

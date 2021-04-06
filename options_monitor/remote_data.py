@@ -463,8 +463,10 @@ class IRemoteHttpData(metaclass = ABCMeta):
         self.save_data_test(df)
 
     #----------------------------------------------------------------------
-    def recalculate_siv_test(self):
+    def recalculate_siv_test(self, recalculate_iv: bool = False):
         """recalculate the siv"""
+        if recalculate_iv:
+            self.recalculate_iv_test()
         _li, df = self.get_last_index()
         df = calculate_siv(df)
         self.save_data_test(df)
