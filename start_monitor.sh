@@ -10,8 +10,10 @@ pypush=
 push=
 pyrecalc_siv=
 recalc_siv=
+pyscp=
+scp=
 
-while getopts "m:ipr" opt; do
+while getopts "m:iprc" opt; do
     case ${opt} in
         m)
             mode=$OPTARG
@@ -28,6 +30,10 @@ while getopts "m:ipr" opt; do
             pyrecalc_siv='--recalculate_siv=True'
             recalc_siv='-r'
             ;;
+        c)
+            pyscp='--scp=True'
+            scp='-c'
+            ;;
         *)
             echo 'unknown argument. '
     esac
@@ -38,7 +44,7 @@ case "$mode" in
         if [ -f ./$PID ]; then
             echo "$SERVICE_NAME is started, please use the restart option. "
         else
-            nohup python3 ./options_monitor.py $pyimm $pypush $pyrecalc_siv 2>&1 &
+            nohup python3 ./options_monitor.py $pyimm $pypush $pyrecalc_siv $pyscp 2>&1 &
             echo $! > ./$PID
             echo "==== start $SERVICE_NAME ===="
         fi

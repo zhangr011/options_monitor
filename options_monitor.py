@@ -5,13 +5,13 @@ from options_monitor.data_ref import SCHEDULE_HOUR, DATE_FORMAT
 from options_monitor.utilities import mk_notification
 from options_monitor.utilities_hv import sort_hv20250
 from options_monitor.schedule_manager import ScheduleManager
-from options_monitor.util_dingding import send_html_msg
+from options_monitor.util_dingding import send_html_msg, scp_data
 from options_monitor.data_manager import calendar_manager, SIVManager
 from options_monitor.logger import logger
 from datetime import datetime
 from time import sleep
 import pandas as pd
-import argparse
+import argparse, subprocess, os
 
 pd.set_option('mode.chained_assignment', None)
 
@@ -22,11 +22,12 @@ class MonitorScheduleManager(ScheduleManager):
     _crontab = f'05 {SCHEDULE_HOUR} * * *'
     day_pushed = None
 
-    def __init__(self, immediately: bool = False, push_msg: bool = False, recalculate_siv: bool = False):
+    def __init__(self, immediately: bool = False, push_msg: bool = False, recalculate_siv: bool = False, scp_data: bool = False):
         """"""
         self._immediately = immediately
         self._push_msg = push_msg
         self._recalculate_siv = recalculate_siv
+        self._scp_data = scp_data
         super(MonitorScheduleManager, self).__init__(immediately)
 
     def do_timeout(self):
@@ -47,6 +48,7 @@ class MonitorScheduleManager(ScheduleManager):
             logger.info('options info fetch failed. ')
             return False
         this_date, final_df = sort_hv20250(all_dfs)
+        scp_data(self._scp_data)
         stat_df = mk_notification(final_df)
         send_html_msg(this_date, stat_df, self._push_msg)
         self._push_msg = True
@@ -70,9 +72,12 @@ if __name__ == '__main__':
     arg_parser.add_argument('--recalculate_siv', type = bool, dest = 'recalculate_siv',
                             default = False,
                             help = 'recalculate the siv before analyze, this may be used when siv calculation method changed. ')
+    arg_parser.add_argument('--scp', type = bool, dest = 'scp_data',
+                            default = False,
+                            help = 'scp the data to remote server. ')
     args = arg_parser.parse_args()
     # logger.info('', args.immediately, type(args.immediately), args.push_msg, type(args.push_msg), args.recalculate_siv, type(args.recalculate_siv))
-    mgr = MonitorScheduleManager(args.immediately, args.push_msg, args.recalculate_siv)
+    mgr = MonitorScheduleManager(args.immediately, args.push_msg, args.recalculate_siv, args.scp_data)
     logger.info('options monitor started. ')
     while True:
         sleep(1)

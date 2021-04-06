@@ -21,6 +21,8 @@ DD_TOKEN = ini_config.get(PUSH_SECTION, 'token')
 HTTP_URL = ini_config.get(PUSH_SECTION, 'html_url')
 FLASK_URL = ini_config.get(PUSH_SECTION, 'html_url_flask')
 FILE_PATH = ini_config.get(PUSH_SECTION, 'file_path')
+REMOTE_HTML_PATH = ini_config.get(PUSH_SECTION, 'remote_html_path')
+REMOTE_PATH = ini_config.get(PUSH_SECTION, 'remote_path')
 DD_TOKEN_ENC = DD_TOKEN.encode('utf-8')
 
 headers = {'Content-Type': 'application/json'}
@@ -105,9 +107,20 @@ def send_html_msg(date_str: str, df: pd.DataFrame, send: bool = True):
     for index, row in df_warn.iterrows():
         warn_msg += f"> {row['name']}: iv {row[IV_NAME]} p {row[IV_PER]}  \n  "
     df.to_html(buf = local_path, bold_rows = False, classes = 'table table-striped', encoding = 'utf_8_sig')
+    if REMOTE_HTML_PATH:
+        os.system(f'scp {local_path} {REMOTE_HTML_PATH}')
+        logger.info('scp html to remote done.')
     title = f"daily report: {date_str}"
     msg = {'msgtype': "markdown",
            'markdown': {"title": title,
                         "text": f"#### {title} \n {warn_msg}> [for details...]({link})  \n  > [svix viewer...]({flask_link}) \n"}}
     if send is True:
         send_msg(msg)
+
+
+#----------------------------------------------------------------------
+def scp_data(flag: bool = True):
+    if flag:
+        logger.info('scp data to the server.')
+        os.system(f'scp ./data/*.csv {REMOTE_PATH}')
+        logger.info('scp done.')
