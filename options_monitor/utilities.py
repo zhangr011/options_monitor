@@ -191,6 +191,8 @@ def mk_notification(df: pd.DataFrame):
     df.index.rename('name', inplace = True)
     df2 = df.applymap(lambda x: f"{x:.1%}".strip('%') if isinstance(x, float) else x,
                       na_action = 'ignore')
+    # for test
+    df = df[~df[HV_PER].isnull()]
     df2[HV_PER] = df[HV_PER].apply(lambda x: f"{int(x)}" if isinstance(x, float) else x)
     df2[IV_PER] = pd.to_numeric(df[IV_PER], errors = 'coerce')
     df2.fillna('-', inplace = True)

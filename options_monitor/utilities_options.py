@@ -173,7 +173,7 @@ class OptionsContractsManager(metaclass = Singleton):
         name, full_date, o_type, s_price = self.parse_the_contract(contract)
         days = calc_remained_days(name, full_date, c_date)
         iv = 0
-        if days > 1:
+        if days > 3:
             # ignore the options' iv of the last day
             iv = calc_iv(name, o_price, u_price, s_price, days, o_type, interest_rate)
         return iv

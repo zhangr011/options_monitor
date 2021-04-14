@@ -25,7 +25,7 @@ sse_calendar = market_cal.get_calendar('SSE')
 # timezone('Asia/Shanghai')
 TZ_INFO = sse_calendar.tz.zone
 
-SCHEDULE_HOUR = 11
+SCHEDULE_HOUR = 8
 
 #----------------------------------------------------------------------
 class SYNC_DATA_MODE(Enum):

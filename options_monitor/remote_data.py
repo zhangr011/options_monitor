@@ -991,6 +991,7 @@ class RemoteHttpCZCEData(IRemoteHttpData):
         df.set_index(INDEX_KEY, inplace = True)
         df.rename({
             u'品种月份' : PRODUCT_ID_NAME,
+            u'合约代码' : PRODUCT_ID_NAME,
             u'昨结算'  : PRE_SETTLE_PRICE_NAME,
             u'今开盘'  : OPEN_PRICE_NAME,
             u'最高价'  : HIGH_PRICE_NAME,
@@ -1028,6 +1029,7 @@ class RemoteHttpCZCEOptionsData(RemoteHttpCZCEData):
         df.set_index(INDEX_KEY, inplace = True)
         df.rename({
             u'品种代码': PRODUCT_ID_NAME,
+            u'合约代码' : PRODUCT_ID_NAME,
             u'昨结算': PRE_SETTLE_PRICE_NAME,
             u'今开盘': OPEN_PRICE_NAME,
             u'最高价': HIGH_PRICE_NAME,

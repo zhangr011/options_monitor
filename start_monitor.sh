@@ -57,7 +57,7 @@ case "$mode" in
     restart)
         $0 -m stop
         sleep 2
-        $0 -m start $imm $push $recalc_siv
+        $0 -m start $imm $push $recalc_siv $scp
         ;;
     *)
         echo "Usage: bash start_monitor.sh -m [start|stop|restart]"
