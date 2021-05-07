@@ -6,7 +6,8 @@ from .data_ref import INDEX_KEY, DATE_FORMAT
 from .data_ref import PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, \
     OPEN_PRICE_NAME, HIGH_PRICE_NAME, LOW_PRICE_NAME, CLOSE_PRICE_NAME, \
     PRE_SETTLE_PRICE_NAME, SETTLE_PRICE_NAME, OPEN_INTEREST_NAME, OI_CHG_NAME, \
-    VOLUME_NAME, TURNOVER_NAME, TOTAL_ROW_KEY, COLUMN_NAMES
+    VOLUME_NAME, TURNOVER_NAME, TOTAL_ROW_KEY, COLUMN_NAMES, REMAIN_DAYS_NAME, \
+    TURNOVER_RDAYS_NAME
 from .data_ref import IV_NAME, U_PRODUCT_ID_NAME, S_PRICE_NAME, \
     U_PRICE_NAME, OPTION_TYPE_NAME, O_COLUMN_NAMES, EXPIRY_NAME
 from .utilities import load_futures_by_csv
@@ -259,23 +260,28 @@ def parse_options_name(df: pd.DataFrame, pattern: str = OPTIONS_NAME_RE):
 def calc_iv_helper(row, total_key: str):
     if row[PRODUCT_ID_NAME] == total_key:
         # for total key, pass the old iv directly
-        return 0.
+        return 0., 0
     else:
-        iv = oc_mgr.calc_iv(row[PRODUCT_ID_NAME], row[CLOSE_PRICE_NAME], row[U_PRICE_NAME], row.name)
-        return iv
+        iv, rdays = oc_mgr.calc_iv_and_rdays(row[PRODUCT_ID_NAME], row[CLOSE_PRICE_NAME], row[U_PRICE_NAME], row.name)
+        return iv, rdays
 
 
 #----------------------------------------------------------------------
 def calculate_iv(df: pd.DataFrame, total_key: str = TOTAL_ROW_KEY):
     """calculate single product's iv"""
-    df[IV_NAME] = df.apply(lambda row: calc_iv_helper(row, total_key), axis = 1)
+    def calc_one_by_one(row):
+        iv, rdays = calc_iv_helper(row, total_key)
+        row[IV_NAME] = iv
+        row[REMAIN_DAYS_NAME] = rdays
+        return row
+    df = df.apply(calc_one_by_one, axis = 1)
     return df
 
 
 #----------------------------------------------------------------------
 def calculate_siv(df_in: pd.DataFrame, total_key: str = TOTAL_ROW_KEY):
     """"""
-    return calculate_siv_by_turnovers(df_in, total_key)
+    return calculate_siv_by_tr(df_in, total_key)
 
 
 #----------------------------------------------------------------------
@@ -286,8 +292,20 @@ def calculate_siv_by_volumes(df_in: pd.DataFrame, total_key: str = TOTAL_ROW_KEY
 
 #----------------------------------------------------------------------
 def calculate_siv_by_turnovers(df_in: pd.DataFrame, total_key: str = TOTAL_ROW_KEY):
-    """as by volumes, the options witch are due to expire may cause iv inaccurate. """
+    """as by volumes, the options that are due to expire may cause iv inaccurate. """
     return calculate_siv_by_column(df_in, TURNOVER_NAME, total_key)
+
+
+#----------------------------------------------------------------------
+def calculate_siv_by_remaind_days(df_in: pd.DataFrame, total_key: str = TOTAL_ROW_KEY):
+    """as by volumes, the options that are due to expire may cause iv inaccurate. """
+    return calculate_siv_by_column(df_in, REMAIN_DAYS_NAME, total_key)
+
+
+#----------------------------------------------------------------------
+def calculate_siv_by_tr(df_in: pd.DataFrame, total_key: str = TOTAL_ROW_KEY):
+    """as by volumes, the options that are due to expire may cause iv inaccurate. """
+    return calculate_siv_by_column(df_in, TURNOVER_RDAYS_NAME, total_key)
 
 
 #----------------------------------------------------------------------
@@ -301,7 +319,11 @@ def calculate_siv_by_column(df_in: pd.DataFrame, column: str, total_key: str = T
                                     0,
                                     np.square((df[STRIKE_BIAS_NAME] - OPTION_BIAS_AA) / OPTION_BIAS_AA))
     # use price * volumes as turnovers
-    df[TURNOVER_NAME] = df[CLOSE_PRICE_NAME] * df[VOLUME_NAME]
+    if column in [TURNOVER_NAME, TURNOVER_RDAYS_NAME]:
+        df[TURNOVER_NAME] = df[CLOSE_PRICE_NAME] * df[VOLUME_NAME]
+        df[TURNOVER_RDAYS_NAME] = np.where(df[REMAIN_DAYS_NAME] > 10,
+                                           df[TURNOVER_NAME] * 10,
+                                           df[TURNOVER_NAME] * df[REMAIN_DAYS_NAME])
     # totals = df[[PRODUCT_GROUP_NAME, column]].groupby([df.index, PRODUCT_GROUP_NAME]).sum()
     # df = df.join(totals, how = 'left', on = [df.index, PRODUCT_GROUP_NAME], rsuffix = '_all')
     df['weights'] = df[STRIKE_BIAS_NAME] * df[column]

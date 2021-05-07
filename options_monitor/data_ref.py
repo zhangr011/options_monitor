@@ -66,6 +66,8 @@ S_PRICE_NAME = 's_price'   # 行权价
 U_PRICE_NAME = 'u_price'   # 标的价
 EXPIRY_NAME = 'expiry'     # 到期日
 TURNOVER_NAME = 'turnover' # 成交金额
+REMAIN_DAYS_NAME = 'rdays' # 剩余时间
+TURNOVER_RDAYS_NAME = 'tr' # 成交金额与剩余时间加权
 
 
 # hv key

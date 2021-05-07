@@ -168,15 +168,14 @@ class OptionsContractsManager(metaclass = Singleton):
         return name, full_date, o_type, s_price
 
     #----------------------------------------------------------------------
-    def calc_iv(self, contract: str, o_price: float, u_price: float, c_date: str, interest_rate: float = INTEREST_RATE):
+    def calc_iv_and_rdays(self, contract: str, o_price: float, u_price: float,
+                          c_date: str, interest_rate: float = INTEREST_RATE):
         """calculate the iv"""
         name, full_date, o_type, s_price = self.parse_the_contract(contract)
         days = calc_remained_days(name, full_date, c_date)
-        iv = 0
-        if days > 3:
-            # ignore the options' iv of the last day
-            iv = calc_iv(name, o_price, u_price, s_price, days, o_type, interest_rate)
-        return iv
+        # ignore the options' iv of the last day
+        iv = calc_iv(name, o_price, u_price, s_price, days, o_type, interest_rate)
+        return iv, days
 
 
 oc_mgr = OptionsContractsManager()

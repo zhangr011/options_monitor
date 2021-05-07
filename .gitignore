@@ -1,3 +1,5 @@
+/build
+/options_monitor.egg-info/
 /logs
 /data
 /data_back
