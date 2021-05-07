@@ -111,6 +111,7 @@ class TestOptionPrice(ut.TestCase):
         self.assertEqual('2020-12-03', oc_mgr.get_expiry_date_test('MA101P2200'))
         self.assertEqual('2020-12-03', oc_mgr.get_expiry_date_test('TA101C3800'))
         self.assertEqual('2020-12-03', oc_mgr.get_expiry_date_test('ZC101P750'))
+        self.assertEqual('2021-05-10', oc_mgr.get_expiry_date_test('ZC106P750'))
         # test cu, al, zn, au, ru
         # special holiday by covid-19, need to be skipped
         self.assertEqual('2020-01-20', oc_mgr.get_expiry_date_test('cu2002C48000'))

@@ -29,12 +29,18 @@ def get_last_trade_dates(delta: int = 500):
 #----------------------------------------------------------------------
 def get_next_trading_day_str(time: pd.Timestamp, shift_days: int = 1):
     """"""
+    # TODO:
+    # 顺延需要处理是否为交易日的详细数据（根据国内交易日历）
+    # 倒推不需要，有时候是特殊情况导致新增假期
+    check_detail = False
+    if shift_days > 0:
+        check_detail = True
     idx = 0
     shift_times = abs(shift_days)
     shift_delta = shift_days // shift_times
     while True:
         day_str = time.strftime(DATE_FORMAT)
-        if calendar_manager.check_open(day_str, False):
+        if calendar_manager.check_open(day_str, check_detail):
             idx += 1
         if idx >= shift_times:
             return day_str
