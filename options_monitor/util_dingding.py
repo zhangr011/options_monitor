@@ -97,7 +97,7 @@ def send_html_msg(date_str: str, df: pd.DataFrame, send: bool = True):
     df.reset_index(inplace = True)
     # ivp check
     df_warn = df[df[IV_PER] != '-']
-    df_warn = df_warn[(df_warn[IV_PER].astype(int) >= 95) | (df_warn[IV_PER].astype(int) <= 15)]
+    df_warn = df_warn[(df_warn[IV_PER].astype(int) >= 90) | (df_warn[IV_PER].astype(int) <= 15)]
     # iv check
     df_warn2 = df[(df[IV_PER] == '-') & (df[IV_NAME] != '-')]
     df_warn2 = df_warn2[(df_warn2[IV_NAME].astype(float) >= df_warn2[IV_MAX].astype(float) * 0.9) |
