@@ -131,7 +131,7 @@ def get_expiry_date(name: str, date_str: str):
         # 上期所，标的期货合约到期日前一个月的倒数第 5 个交易日
         dates = LAST_BUSINESS_DAY[LAST_BUSINESS_DAY < date_str]
         day_str = get_next_trading_day_str(dates[-1], -5)
-    elif name in ['m', 'c', 'i', 'pg', 'l', 'v', 'pp']:
+    elif name in ['m', 'c', 'i', 'pg', 'l', 'v', 'pp', 'p']:
         # 大商所，标的期货合约到期日前一个月的第 5 个交易日
         dates = FIRST_BUSINESS_DAY[FIRST_BUSINESS_DAY < date_str]
         day_str = get_next_trading_day_str(dates[-1], 5)
