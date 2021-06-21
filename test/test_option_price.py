@@ -4,7 +4,7 @@ import unittest as ut
 
 from options_monitor.data_ref import \
     INDEX_KEY, TOTAL_ROW_KEY, IV_NAME, PRODUCT_ID_NAME, PRODUCT_GROUP_NAME, \
-    S_PRICE_NAME, U_PRICE_NAME, CLOSE_PRICE_NAME, VOLUME_NAME
+    S_PRICE_NAME, U_PRICE_NAME, CLOSE_PRICE_NAME, VOLUME_NAME, REMAIN_DAYS_NAME
 from options_monitor.remote_data import \
     calculate_iv, calculate_siv_by_volumes, calculate_siv_by_turnovers, calculate_siv_by_remaind_days
 from options_monitor.utilities_options import \
@@ -43,6 +43,7 @@ class TestOptionPrice(ut.TestCase):
         df[VOLUME_NAME] = df[VOLUME_NAME].astype(int)
         df[IV_NAME] = df[IV_NAME].astype(float)
         df_iv = calculate_iv(df.copy())
+        df[REMAIN_DAYS_NAME] = df_iv[REMAIN_DAYS_NAME]
         ivs = df_iv[IV_NAME].tolist()
         self.assertEqual([0.4109, 0.3242, 0.3803, 0.416, 0.1992, 0], ivs)
         # test for iv of 0
@@ -125,6 +126,8 @@ class TestOptionPrice(ut.TestCase):
         self.assertEqual('2020-03-25', oc_mgr.get_expiry_date_test('au2004C316'))
         self.assertEqual('2020-07-27', oc_mgr.get_expiry_date_test('au2008P360'))
         self.assertEqual('2021-02-22', oc_mgr.get_expiry_date_test('ru2103C10000'))
+        # test sc
+        self.assertEqual('2021-08-13', oc_mgr.get_expiry_date_test('sc2109C440'))
 
     #----------------------------------------------------------------------
     def testCFFEOptionPrice(self):
